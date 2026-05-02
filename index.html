@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+  <title>Arabic Quest</title>
+
+  <!-- PWA / iPhone home screen -->
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Arabic Quest"/>
+  <meta name="theme-color" content="#0b1219"/>
+
+  <!-- Pixel font -->
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"/>
+
+  <!-- React + Babel (no build step needed) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body,#root{height:100%;background:#0b1219}
+    body{-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none}
+    button:active{opacity:.85;transform:translateY(1px)}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const FORM_NAMES = ['isolated','initial','medial','final'];
+    const AR = '"Noto Naskh Arabic","Traditional Arabic",Arial,sans-serif';
+    const PX = "'Press Start 2P','Courier New',monospace";
+
+    const LETTERS = [
+      {id:0, name:'Alef',  ar:'ا',t:'aa',   isolated:'ا', initial:'ا',  medial:'ـا', final:'ـا', hint:"Long 'a' like in father"},
+      {id:1, name:'Ba',    ar:'ب',t:'b',    isolated:'ب', initial:'بـ', medial:'ـبـ',final:'ـب', hint:"Like 'b' in boy"},
+      {id:2, name:'Ta',    ar:'ت',t:'t',    isolated:'ت', initial:'تـ', medial:'ـتـ',final:'ـت', hint:"Like 't' in table"},
+      {id:3, name:'Tha',   ar:'ث',t:'th',   isolated:'ث', initial:'ثـ', medial:'ـثـ',final:'ـث', hint:"Like 'th' in think"},
+      {id:4, name:'Jeem',  ar:'ج',t:'j',    isolated:'ج', initial:'جـ', medial:'ـجـ',final:'ـج', hint:"Like 'j' in jam"},
+      {id:5, name:'Ha',    ar:'ح',t:'ḥ',    isolated:'ح', initial:'حـ', medial:'ـحـ',final:'ـح', hint:"Breathy h from the throat"},
+      {id:6, name:'Kha',   ar:'خ',t:'kh',   isolated:'خ', initial:'خـ', medial:'ـخـ',final:'ـخ', hint:"Like 'ch' in Scottish loch"},
+      {id:7, name:'Dal',   ar:'د',t:'d',    isolated:'د', initial:'د',  medial:'ـد', final:'ـد', hint:"Like 'd' in door"},
+      {id:8, name:'Thal',  ar:'ذ',t:'dh',   isolated:'ذ', initial:'ذ',  medial:'ـذ', final:'ـذ', hint:"Like 'th' in that"},
+      {id:9, name:'Ra',    ar:'ر',t:'r',    isolated:'ر', initial:'ر',  medial:'ـر', final:'ـر', hint:"Rolled 'r' sound"},
+      {id:10,name:'Zay',   ar:'ز',t:'z',    isolated:'ز', initial:'ز',  medial:'ـز', final:'ـز', hint:"Like 'z' in zero"},
+      {id:11,name:'Seen',  ar:'س',t:'s',    isolated:'س', initial:'سـ', medial:'ـسـ',final:'ـس', hint:"Like 's' in sun"},
+      {id:12,name:'Sheen', ar:'ش',t:'sh',   isolated:'ش', initial:'شـ', medial:'ـشـ',final:'ـش', hint:"Like 'sh' in ship"},
+      {id:13,name:'Sad',   ar:'ص',t:'ṣ',    isolated:'ص', initial:'صـ', medial:'ـصـ',final:'ـص', hint:"Emphatic 's' sound"},
+      {id:14,name:'Dad',   ar:'ض',t:'ḍ',    isolated:'ض', initial:'ضـ', medial:'ـضـ',final:'ـض', hint:"Unique Arabic emphatic d"},
+      {id:15,name:'Taa',   ar:'ط',t:'ṭ',    isolated:'ط', initial:'طـ', medial:'ـطـ',final:'ـط', hint:"Emphatic 't' sound"},
+      {id:16,name:'Dhaa',  ar:'ظ',t:'ẓ',    isolated:'ظ', initial:'ظـ', medial:'ـظـ',final:'ـظ', hint:"Emphatic 'dh' sound"},
+      {id:17,name:'Ain',   ar:'ع',t:"'ain", isolated:'ع', initial:'عـ', medial:'ـعـ',final:'ـع', hint:"Unique guttural sound"},
+      {id:18,name:'Ghain', ar:'غ',t:'gh',   isolated:'غ', initial:'غـ', medial:'ـغـ',final:'ـغ', hint:"Like French 'r'"},
+      {id:19,name:'Fa',    ar:'ف',t:'f',    isolated:'ف', initial:'فـ', medial:'ـفـ',final:'ـف', hint:"Like 'f' in fan"},
+      {id:20,name:'Qaf',   ar:'ق',t:'q',    isolated:'ق', initial:'قـ', medial:'ـقـ',final:'ـق', hint:"Deep 'k' from the throat"},
+      {id:21,name:'Kaf',   ar:'ك',t:'k',    isolated:'ك', initial:'كـ', medial:'ـكـ',final:'ـك', hint:"Like 'k' in key"},
+      {id:22,name:'Lam',   ar:'ل',t:'l',    isolated:'ل', initial:'لـ', medial:'ـلـ',final:'ـل', hint:"Like 'l' in lamp"},
+      {id:23,name:'Meem',  ar:'م',t:'m',    isolated:'م', initial:'مـ', medial:'ـمـ',final:'ـم', hint:"Like 'm' in moon"},
+      {id:24,name:'Noon',  ar:'ن',t:'n',    isolated:'ن', initial:'نـ', medial:'ـنـ',final:'ـن', hint:"Like 'n' in night"},
+      {id:25,name:'Haa',   ar:'ه',t:'h',    isolated:'ه', initial:'هـ', medial:'ـهـ',final:'ـه', hint:"Like 'h' in house"},
+      {id:26,name:'Waw',   ar:'و',t:'w/oo', isolated:'و', initial:'و',  medial:'ـو', final:'ـو', hint:"Like 'w' or 'oo' in moon"},
+      {id:27,name:'Ya',    ar:'ي',t:'y/ee', isolated:'ي', initial:'يـ', medial:'ـيـ',final:'ـي', hint:"Like 'y' or 'ee' in tree"},
+    ];
+
+    const MATS = [
+      {name:'Wood',     emoji:'🪵',color:'#C68642',minXP:0},
+      {name:'Stone',    emoji:'🪨',color:'#909090',minXP:100},
+      {name:'Iron',     emoji:'⚙️', color:'#D4D4D4',minXP:300},
+      {name:'Gold',     emoji:'🥇',color:'#FFD700',minXP:600},
+      {name:'Diamond',  emoji:'💎',color:'#4DE8E8',minXP:1000},
+      {name:'Netherite',emoji:'🖤',color:'#BBBBBB',minXP:2000},
+    ];
+
+    const C = {
+      bg:'#0b1219',panel:'rgba(0,0,0,0.82)',bD:'#3a4a5a',bL:'#6a8a9a',
+      grass:'#4a7c3f',grassL:'#5fa34f',stone:'#555568',nether:'#cc4422',
+      gold:'#FFD700',emerald:'#1aee6a',heart:'#ff3333',xp:'#7CFC00',
+      diamond:'#3dd9d9',dim:'#8899aa',correct:'#2d6b28',wrong:'#7a1111',opt:'#15253a',
+    };
+
+    const getMat = xp => { let m=MATS[0]; for(const x of MATS) if(xp>=x.minXP) m=x; return m; };
+    const shuffle = a => [...a].sort(()=>Math.random()-.5);
+    const wrongs = (l,n=3) => shuffle(LETTERS.filter(x=>x.id!==l.id)).slice(0,n);
+
+    const buildEx = (letter, form) => {
+      const type = ['name','arabic','form'][Math.floor(Math.random()*3)];
+      if(type==='name'){
+        const opts = shuffle([letter,...wrongs(letter)]).map(l=>({id:l.id,display:l.name,sub:`(${l.t})`,isArabic:false,isCorrect:l.id===letter.id}));
+        return {type,letterId:letter.id,qAr:letter[form],qText:'What letter is this?',qSub:`${form} form`,opts};
+      }
+      if(type==='arabic'){
+        const opts = shuffle([letter,...wrongs(letter)]).map(l=>({id:l.id,display:l.isolated,isArabic:true,isCorrect:l.id===letter.id}));
+        return {type,letterId:letter.id,qAr:null,qText:'Find the letter:',qBig:`${letter.name} (${letter.t})`,qSub:letter.hint,opts};
+      }
+      const opts = FORM_NAMES.map(f=>({id:f,display:f[0].toUpperCase()+f.slice(1),isArabic:false,isCorrect:f===form}));
+      return {type,letterId:letter.id,qAr:letter[form],qText:`Which form of "${letter.name}"?`,opts};
+    };
+
+    const buildSession = mastered => {
+      const pool = LETTERS.filter(l=>!mastered.includes(l.id));
+      const src = pool.length>=4?pool:LETTERS;
+      const sel = shuffle(src).slice(0,6);
+      const exs = [];
+      sel.forEach(letter=>{
+        const f1=FORM_NAMES[Math.floor(Math.random()*4)];
+        const f2=FORM_NAMES[(FORM_NAMES.indexOf(f1)+2)%4];
+        exs.push(buildEx(letter,f1));
+        exs.push(buildEx(letter,f2));
+      });
+      return shuffle(exs).slice(0,12);
+    };
+
+    const dk = h => {
+      const n=parseInt(h.replace('#',''),16);
+      return `rgb(${Math.max(0,(n>>16)-55)},${Math.max(0,((n>>8)&255)-55)},${Math.max(0,(n&255)-55)})`;
+    };
+    const pn = (e={}) => ({background:C.panel,border:`3px solid ${C.bD}`,borderTop:`3px solid ${C.bL}`,borderLeft:`3px solid ${C.bL}`,padding:'14px',...e});
+    const bt = (bg,e={}) => ({fontFamily:PX,background:bg,color:'#fff',border:'none',borderBottom:`4px solid ${dk(bg)}`,borderRight:`4px solid ${dk(bg)}`,borderTop:'2px solid rgba(255,255,255,0.13)',borderLeft:'2px solid rgba(255,255,255,0.13)',padding:'12px 14px',cursor:'pointer',fontSize:'9px',textShadow:'1px 1px 0 rgba(0,0,0,0.8)',width:'100%',textAlign:'center',letterSpacing:'0.5px',lineHeight:'1.6',...e});
+
+    const PBar = ({value,max,color=C.xp,h=8}) => (
+      <div style={{background:'#111',height:h,border:`2px solid ${C.bD}`}}>
+        <div style={{width:`${Math.min(100,max>0?(value/max)*100:0)}%`,height:'100%',background:color,transition:'width .4s ease'}}/>
+      </div>
+    );
+    const Hearts = ({cur,max=5}) => (
+      <div style={{display:'flex',gap:'2px'}}>
+        {Array.from({length:max}).map((_,i)=><span key={i} style={{fontSize:'14px',opacity:i<cur?1:.2,transition:'opacity .3s'}}>❤️</span>)}
+      </div>
+    );
+
+    // ── HOME ──────────────────────────────────────────────
+    function Home({player,onPlace,onContinue}) {
+      const mat = getMat(player.xp);
+      const isNew = !player.placementDone;
+      return (
+        <div style={{minHeight:'100vh',fontFamily:PX,background:`linear-gradient(180deg,#0a1628 0%,#0a1628 52%,${C.grass} 52%,${C.grass} 63%,#5c2e0e 63%)`,display:'flex',flexDirection:'column',alignItems:'center',padding:'28px 18px',position:'relative',overflow:'hidden'}}>
+          {[[12,8],[28,14],[55,6],[72,18],[88,10],[40,22],[65,28],[18,30]].map(([x,y],i)=>(
+            <div key={i} style={{position:'absolute',left:`${x}%`,top:`${y}%`,width:i%2?'2px':'4px',height:i%2?'2px':'4px',background:'white',opacity:.7}}/>
+          ))}
+          <div style={{position:'relative',zIndex:1,width:'100%',maxWidth:'360px',display:'flex',flexDirection:'column',alignItems:'center'}}>
+            <div style={{fontSize:'22px',color:C.gold,textShadow:'3px 3px 0 #000,-1px 0 0 #000',textAlign:'center',marginBottom:'4px'}}>⛏ ARABIC QUEST</div>
+            <div style={{fontSize:'7px',color:'#99ccff',textShadow:'1px 1px 0 #000',marginBottom:'32px',textAlign:'center'}}>Mine Arabic. Craft Knowledge.</div>
+            <div style={{width:'72px',height:'72px',background:C.grass,border:'4px solid #2d4d1e',boxShadow:'4px 4px 0 #1a2e10',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'36px',marginBottom:'28px'}}>👾</div>
+            {!isNew && (
+              <div style={{...pn({marginBottom:'18px',width:'100%'})}}>
+                <div style={{color:mat.color,fontSize:'8px',marginBottom:'8px'}}>{mat.emoji} {mat.name} Explorer</div>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:'8px'}}>
+                  <span style={{color:C.dim,fontSize:'7px'}}>XP: <span style={{color:C.xp}}>{player.xp}</span></span>
+                  <span style={{color:C.dim,fontSize:'7px'}}>💎 <span style={{color:C.emerald}}>{player.emeralds}</span></span>
+                  <span style={{color:C.dim,fontSize:'7px'}}>🔥 <span style={{color:'#FF8C00'}}>{player.streak}d</span></span>
+                </div>
+                <div style={{color:C.dim,fontSize:'6px',marginBottom:'4px'}}>Letters: {player.mastered.length}/28</div>
+                <PBar value={player.mastered.length} max={28} color={C.diamond} h={6}/>
+              </div>
+            )}
+            <div style={{display:'flex',flexDirection:'column',gap:'10px',width:'100%'}}>
+              {isNew
+                ? <button style={bt(C.grass)} onClick={onPlace}>🗺️ START YOUR ADVENTURE</button>
+                : <><button style={bt(C.grass)} onClick={onContinue}>▶ CONTINUE QUEST</button>
+                   <button style={bt(C.stone,{fontSize:'7px'})} onClick={onPlace}>📋 RETAKE PLACEMENT TEST</button></>}
+            </div>
+            {player.streak>0 && <div style={{marginTop:'20px',color:'#FF8C00',fontSize:'7px',textAlign:'center'}}>🔥 {player.streak} DAY SURVIVAL STREAK!</div>}
+          </div>
+        </div>
+      );
+    }
+
+    // ── PLACEMENT ─────────────────────────────────────────
+    function Placement({onDone}) {
+      const [qs] = useState(()=>shuffle(LETTERS).map(letter=>{
+        const form=FORM_NAMES[Math.floor(Math.random()*4)];
+        const opts=shuffle([letter,...wrongs(letter)]).map(l=>({id:l.id,display:l.name,sub:l.t,isCorrect:l.id===letter.id}));
+        return {letter,form,opts};
+      }));
+      const [idx,setIdx]=useState(0); const [results,setResults]=useState({});
+      const [sel,setSel]=useState(null); const [fb,setFb]=useState(null);
+      const q=qs[idx];
+      const pick=optId=>{
+        if(fb)return;
+        const ok=q.opts.find(o=>o.id===optId)?.isCorrect||false;
+        setSel(optId); setFb(ok?'ok':'no');
+        const nr={...results,[q.letter.id]:ok}; setResults(nr);
+        setTimeout(()=>{
+          if(idx+1>=qs.length){onDone(nr);}
+          else{setIdx(i=>i+1);setSel(null);setFb(null);}
+        },700);
+      };
+      return (
+        <div style={{minHeight:'100vh',background:C.bg,padding:'18px',fontFamily:PX,display:'flex',flexDirection:'column'}}>
+          <div style={{marginBottom:'14px'}}>
+            <div style={{color:C.gold,fontSize:'9px',marginBottom:'6px'}}>📋 PLACEMENT TEST</div>
+            <div style={{color:C.dim,fontSize:'6px',marginBottom:'6px'}}>Letter {idx+1} of {qs.length} — all 28 letters</div>
+            <PBar value={idx} max={qs.length} color={C.gold} h={7}/>
+          </div>
+          <div style={{...pn({flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',marginBottom:'16px',minHeight:'180px'})}}>
+            <div style={{color:C.dim,fontSize:'7px',marginBottom:'14px'}}>Which letter is this? <span style={{color:'#445'}}>({q.form} form)</span></div>
+            <div style={{fontSize:'86px',fontFamily:AR,color:'white',lineHeight:1,textAlign:'center',filter:fb==='ok'?'drop-shadow(0 0 14px #4de8e8)':'none',transition:'filter .3s'}}>
+              {q.letter[q.form]}
+            </div>
+            <div style={{color:'#2a3a2a',fontSize:'7px',marginTop:'12px'}}>Tap the correct name</div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+            {q.opts.map(opt=>{
+              let bg=C.opt; if(fb){if(opt.isCorrect)bg=C.correct;else if(opt.id===sel)bg=C.wrong;}
+              return (<button key={opt.id} onClick={()=>pick(opt.id)} style={bt(bg,{padding:'14px 8px',lineHeight:1.8})}>
+                <div style={{fontSize:'8px'}}>{opt.display}</div>
+                <div style={{fontSize:'6px',color:'rgba(255,255,255,0.4)',marginTop:'2px'}}>({opt.sub})</div>
+              </button>);
+            })}
+          </div>
+          <div style={{marginTop:'14px',color:'#1a2a1a',fontSize:'6px',textAlign:'center'}}>This personalizes your learning journey</div>
+        </div>
+      );
+    }
+
+    // ── MAP ───────────────────────────────────────────────
+    function WorldMap({player,onZone}) {
+      const mat=getMat(player.xp);
+      const zones=[
+        {id:'village',name:'THE VILLAGE',ar:'القرية',emoji:'🏡',bg:C.grass,locked:false,note:`${player.mastered.length}/28 letters mastered`},
+        {id:'mine',name:'THE MINE',ar:'المنجم',emoji:'⛏️',bg:C.stone,locked:player.mastered.length<10,note:player.mastered.length<10?`Need 10 letters (${player.mastered.length}/10)`:'Unlocked!'},
+        {id:'nether',name:'THE NETHER',ar:'العالم الآخر',emoji:'🔥',bg:C.nether,locked:player.mastered.length<28,note:'Master all 28 letters first'},
+      ];
+      return (
+        <div style={{minHeight:'100vh',background:C.bg,padding:'18px',fontFamily:PX}}>
+          <div style={{...pn({marginBottom:'14px'})}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div><div style={{color:mat.color,fontSize:'8px'}}>{mat.emoji} {mat.name}</div><div style={{color:C.dim,fontSize:'6px',marginTop:'2px'}}>{player.xp} XP</div></div>
+              <div style={{textAlign:'center'}}><div style={{color:'#FF8C00',fontSize:'9px'}}>🔥 {player.streak}</div><div style={{color:C.dim,fontSize:'6px'}}>day streak</div></div>
+              <div style={{textAlign:'right'}}><div style={{color:C.emerald,fontSize:'8px',marginBottom:'2px'}}>💎 {player.emeralds}</div><Hearts cur={player.hearts} max={5}/></div>
+            </div>
+          </div>
+          <div style={{color:C.gold,fontSize:'10px',marginBottom:'4px'}}>🗺️ WORLD MAP</div>
+          <div style={{color:C.dim,fontSize:'6px',marginBottom:'14px'}}>Choose your zone, adventurer</div>
+          <div style={{...pn({marginBottom:'14px',borderColor:player.dailyDone?'#2d6b28':'#cc7700',borderTopColor:player.dailyDone?C.grassL:'#ffaa00'})}}>
+            {player.dailyDone
+              ?<div style={{color:C.grassL,fontSize:'7px'}}>✅ DAILY MISSION COMPLETE! See you tomorrow.</div>
+              :<><div style={{color:'#FF8C00',fontSize:'7px',marginBottom:'4px'}}>📜 DAILY MISSION ACTIVE</div><div style={{color:C.dim,fontSize:'6px'}}>Survive 15 minutes in Arabic World today!</div></>}
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'16px'}}>
+            {zones.map(z=>(
+              <button key={z.id} onClick={()=>!z.locked&&onZone(z.id)}
+                style={bt(z.locked?'#1a1a2a':z.bg,{padding:'14px',display:'flex',alignItems:'center',gap:'12px',opacity:z.locked?.45:1,cursor:z.locked?'not-allowed':'pointer',textAlign:'left'})}>
+                <span style={{fontSize:'26px',flexShrink:0}}>{z.locked?'🔒':z.emoji}</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:'8px'}}>{z.name}</div>
+                  <div style={{fontFamily:AR,fontSize:'13px',color:'rgba(255,255,255,0.5)',marginTop:'2px'}}>{z.ar}</div>
+                  <div style={{fontSize:'6px',color:'rgba(255,255,255,0.35)',marginTop:'2px'}}>{z.note}</div>
+                </div>
+                {!z.locked&&<span>▶</span>}
+              </button>
+            ))}
+          </div>
+          <div style={pn()}>
+            <div style={{color:C.dim,fontSize:'6px',marginBottom:'8px'}}>LETTERS MASTERED</div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:'3px',marginBottom:'8px'}}>
+              {LETTERS.map(l=>(
+                <div key={l.id} title={l.name} style={{width:'21px',height:'21px',fontFamily:AR,fontSize:'12px',background:player.mastered.includes(l.id)?'#2d5a28':'#111',border:`1px solid ${player.mastered.includes(l.id)?C.grassL:'#333'}`,display:'flex',alignItems:'center',justifyContent:'center',transition:'background .4s'}}>
+                  {l.ar}
+                </div>
+              ))}
+            </div>
+            <PBar value={player.mastered.length} max={28} color={C.diamond} h={6}/>
+            <div style={{color:C.dim,fontSize:'6px',marginTop:'4px'}}>{28-player.mastered.length} letters left to unlock The Mine</div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── LESSON ────────────────────────────────────────────
+    function Lesson({player,onDone,onBack}) {
+      const [exs]=useState(()=>buildSession(player.mastered));
+      const [idx,setIdx]=useState(0); const [hearts,setHearts]=useState(player.hearts);
+      const [xp,setXp]=useState(0); const [em,setEm]=useState(0);
+      const [correct,setCorrect]=useState(0); const [sel,setSel]=useState(null);
+      const [fb,setFb]=useState(null); const [secs,setSecs]=useState(0);
+      const [done,setDone]=useState(false); const [learned,setLearned]=useState([]);
+      const [bonus,setBonus]=useState(false);
+      useEffect(()=>{ if(done)return; const t=setInterval(()=>setSecs(s=>s+1),1000); return ()=>clearInterval(t); },[done]);
+      const ex=exs[idx];
+      const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+      const pick=optId=>{
+        if(fb||done)return;
+        const ok=ex.opts.find(o=>o.id===optId)?.isCorrect||false;
+        setSel(optId); setFb(ok?'ok':'no');
+        let nh=hearts,nc=correct,nx=xp,ne=em;
+        if(ok){nc++;nx+=10;setLearned(p=>[...new Set([...p,ex.letterId])]);if(nc%5===0){ne+=2;setBonus(true);setTimeout(()=>setBonus(false),1100);}}
+        else{nh=Math.max(0,hearts-1);}
+        setHearts(nh);setCorrect(nc);setXp(nx);setEm(ne);
+        const over=nh===0||(idx+1)>=exs.length;
+        setTimeout(()=>{if(over)setDone(true);else{setIdx(i=>i+1);setSel(null);setFb(null);}},900);
+      };
+      if(done) return <Complete xp={xp} em={em} correct={correct} total={idx+1} secs={secs} hearts={hearts} onContinue={()=>onDone({xp,em,learned,secs})}/>;
+      if(!ex)return null;
+      return (
+        <div style={{minHeight:'100vh',background:'linear-gradient(180deg,#0c1f0c,#080f08)',padding:'14px',fontFamily:PX,display:'flex',flexDirection:'column',position:'relative'}}>
+          {bonus&&<div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',background:'rgba(0,0,0,0.95)',border:`3px solid ${C.emerald}`,padding:'16px 24px',zIndex:100,textAlign:'center',fontSize:'10px',color:C.emerald}}>💎 +2 EMERALDS!</div>}
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}}>
+            <button onClick={onBack} style={{background:'none',border:'none',color:'#444',fontSize:'22px',cursor:'pointer',padding:'0 4px'}}>←</button>
+            <Hearts cur={hearts} max={5}/>
+            <div style={{color:C.gold,fontSize:'7px'}}>+{xp} XP</div>
+          </div>
+          <div style={{marginBottom:'10px'}}>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:'4px'}}>
+              <span style={{color:C.dim,fontSize:'6px'}}>{idx+1}/{exs.length} questions</span>
+              <span style={{color:secs>=900?C.grassL:C.dim,fontSize:'6px'}}>⏱ {fmt(secs)} {secs>=900?'✅':'/ 15:00'}</span>
+            </div>
+            <PBar value={idx} max={exs.length} h={6}/>
+            <div style={{marginTop:'3px'}}><PBar value={Math.min(secs,900)} max={900} color='#FF8C00' h={4}/></div>
+          </div>
+          <div style={{...pn({flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',marginBottom:'14px',minHeight:'200px'})}}>
+            <div style={{color:C.dim,fontSize:'7px',marginBottom:'12px',textAlign:'center'}}>{ex.qText}</div>
+            {ex.qAr&&<div style={{fontSize:'82px',fontFamily:AR,color:'white',lineHeight:1,textAlign:'center',filter:`drop-shadow(0 0 ${fb==='ok'?'18px #4a7c3f':fb==='no'?'18px #7a1111':'0px transparent'})`,transition:'filter .3s'}}>{ex.qAr}</div>}
+            {ex.qBig&&<div style={{fontSize:'13px',color:C.gold,marginBottom:'8px',textAlign:'center'}}>{ex.qBig}</div>}
+            {ex.qSub&&<div style={{color:'#445',fontSize:'6px',marginTop:'8px',textAlign:'center'}}>{ex.qSub}</div>}
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+            {ex.opts.map(opt=>{
+              let bg=C.opt; if(fb){if(opt.isCorrect)bg=C.correct;else if(opt.id===sel)bg=C.wrong;}
+              return (<button key={String(opt.id)} onClick={()=>pick(opt.id)} style={bt(bg,{padding:'12px 8px',display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',transition:'background .2s'})}>
+                {opt.isArabic?<span style={{fontFamily:AR,fontSize:'34px',lineHeight:1}}>{opt.display}</span>:<span style={{fontSize:'7px'}}>{opt.display}</span>}
+                {opt.sub&&<span style={{fontSize:'5px',color:'rgba(255,255,255,0.35)'}}>{opt.sub}</span>}
+              </button>);
+            })}
+          </div>
+          {fb&&<div style={{marginTop:'8px',padding:'8px',background:fb==='ok'?'rgba(45,107,40,.5)':'rgba(122,17,17,.5)',border:`2px solid ${fb==='ok'?C.grassL:'#aa2222'}`,color:'white',fontSize:'7px',textAlign:'center'}}>
+            {fb==='ok'?'✅ Correct! +10 XP':`❌ Answer: ${ex.opts.find(o=>o.isCorrect)?.display||''}`}
+          </div>}
+        </div>
+      );
+    }
+
+    // ── COMPLETE ──────────────────────────────────────────
+    function Complete({xp,em,correct,total,secs,hearts,onContinue}) {
+      const acc=total>0?Math.round((correct/total)*100):0;
+      const fmt=s=>`${Math.floor(s/60)}m ${String(s%60).padStart(2,'0')}s`;
+      return (
+        <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#060618,#12062a)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'20px',fontFamily:PX}}>
+          <div style={{fontSize:'52px',marginBottom:'12px'}}>{acc>=80?'🏆':acc>=50?'⭐':'💪'}</div>
+          <div style={{color:C.gold,fontSize:'13px',textShadow:'2px 2px 0 #000',marginBottom:'6px',textAlign:'center'}}>QUEST COMPLETE!</div>
+          {secs>=900?<div style={{color:C.grassL,fontSize:'7px',marginBottom:'20px',textAlign:'center'}}>🔥 15-MINUTE DAILY MISSION DONE!</div>
+            :<div style={{color:C.dim,fontSize:'7px',marginBottom:'20px',textAlign:'center'}}>Aim for 15 minutes next session!</div>}
+          <div style={{...pn({width:'100%',maxWidth:'320px',marginBottom:'20px'})}}>
+            {[['⭐ XP EARNED',`+${xp}`,C.xp],['💎 EMERALDS',`+${em}`,C.emerald],['🎯 ACCURACY',`${acc}%`,acc>=80?C.grassL:C.gold],
+              ['✅ CORRECT',`${correct}/${total}`,C.diamond],['⏱ TIME',fmt(secs),C.dim],['❤️ HEARTS',`${hearts}/5`,C.heart]]
+              .map(([label,val,col])=>(
+              <div key={label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'9px'}}>
+                <span style={{color:C.dim,fontSize:'6px'}}>{label}</span>
+                <span style={{color:col,fontSize:'8px'}}>{val}</span>
+              </div>
+            ))}
+          </div>
+          <button style={bt(C.grass,{maxWidth:'320px',fontSize:'8px'})} onClick={onContinue}>🗺️ BACK TO MAP</button>
+          <div style={{marginTop:'14px',color:'#1a2a1a',fontSize:'6px',textAlign:'center'}}>Return tomorrow to keep your streak alive! 🔥</div>
+        </div>
+      );
+    }
+
+    // ── APP ───────────────────────────────────────────────
+    function App() {
+      const [screen,setScreen]=useState('home');
+      const [player,setPlayer]=useState({xp:0,hearts:5,emeralds:0,streak:0,mastered:[],dailyDone:false,placementDone:false});
+      const handlePlacement=results=>{
+        const known=Object.entries(results).filter(([,v])=>v).map(([k])=>Number(k));
+        setPlayer(p=>({...p,mastered:known,xp:known.length*8,emeralds:Math.floor(known.length/4),placementDone:true}));
+        setScreen('map');
+      };
+      const handleDone=({xp,em,learned,secs})=>{
+        setPlayer(p=>({...p,xp:p.xp+xp,emeralds:p.emeralds+em,hearts:5,mastered:[...new Set([...p.mastered,...learned])],streak:p.dailyDone?p.streak:p.streak+1,dailyDone:true}));
+        setScreen('map');
+      };
+      return (
+        <div style={{maxWidth:'430px',margin:'0 auto',minHeight:'100vh'}}>
+          {screen==='home'      && <Home player={player} onPlace={()=>setScreen('placement')} onContinue={()=>setScreen('map')}/>}
+          {screen==='placement' && <Placement onDone={handlePlacement}/>}
+          {screen==='map'       && <WorldMap player={player} onZone={z=>z==='village'&&setScreen('lesson')}/>}
+          {screen==='lesson'    && <Lesson player={player} onDone={handleDone} onBack={()=>setScreen('map')}/>}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App/>);
+  </script>
+</body>
+</html>
