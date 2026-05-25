@@ -36,7 +36,7 @@ const { useState, useEffect } = React;
 const FORM_NAMES = ['isolated','initial','medial','final'];
 const AR  = '"Noto Naskh Arabic","Traditional Arabic",Arial,sans-serif';
 const PX  = "'Press Start 2P','Courier New',monospace";
-const SAVE_KEY = 'arabic_quest_v3';
+const SAVE_KEY = 'arabic_quest_v4';
 
 const LETTERS = [
   {id:0, name:'Alef', ar:'ا',t:'aa',   isolated:'ا',initial:'ا',  medial:'ـا', final:'ـا', hint:"Long 'a' like in 'father'",    word:'أسد (asad) = lion'},
@@ -709,11 +709,8 @@ function App() {
         });
         return next;
       });
-      const newMastered=[...new Set([...player.mastered,...learnedIds])].filter(id=>{
-        const s=letterStats[id];
-        if(!s||s.total<3)return learnedIds.includes(id);
-        return(s.correct/s.total)>=0.7;
-      });
+      // Never remove previously mastered letters — only add new ones from this session
+      const newMastered=[...new Set([...player.mastered,...learnedIds])];
       const today=new Date().toDateString();
       setPlayer(p=>({...p,xp:p.xp+xp,emeralds:p.emeralds+em,hearts:5,mastered:newMastered,streak:p.dailyDone?p.streak:p.streak+1,dailyDone:true,lastPlayDate:today}));
     } else {
