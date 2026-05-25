@@ -20,729 +20,735 @@
     @keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
     @keyframes pop{0%{transform:scale(.7);opacity:0}70%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
     @keyframes glow{0%,100%{opacity:.7}50%{opacity:1}}
+    @keyframes shimmer{0%{opacity:.5}50%{opacity:1}100%{opacity:.5}}
     .slide-up{animation:slideUp .35s ease both}
     .pop{animation:pop .4s ease both}
     .glow{animation:glow 2s ease-in-out infinite}
+    .shimmer{animation:shimmer 1.8s ease-in-out infinite}
   </style>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="text/babel">
-    const { useState, useEffect, useCallback } = React;
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
 
-    // ── CONSTANTS ────────────────────────────────────────────────
-    const FORM_NAMES = ['isolated','initial','medial','final'];
-    const AR = '"Noto Naskh Arabic","Traditional Arabic",Arial,sans-serif';
-    const PX = "'Press Start 2P','Courier New',monospace";
-    const SAVE_KEY = 'arabic_quest_v2';
+// ── CONSTANTS ─────────────────────────────────────────────────────
+const FORM_NAMES = ['isolated','initial','medial','final'];
+const AR  = '"Noto Naskh Arabic","Traditional Arabic",Arial,sans-serif';
+const PX  = "'Press Start 2P','Courier New',monospace";
+const SAVE_KEY = 'arabic_quest_v3';
 
-    const LETTERS = [
-      {id:0, name:'Alef',  ar:'ا',t:'aa',   isolated:'ا', initial:'ا',  medial:'ـا', final:'ـا', hint:"Long 'a' like in 'father'", word:'أسد (asad) = lion'},
-      {id:1, name:'Ba',    ar:'ب',t:'b',    isolated:'ب', initial:'بـ', medial:'ـبـ',final:'ـب', hint:"Like 'b' in 'boy'",          word:'بيت (bayt) = house'},
-      {id:2, name:'Ta',    ar:'ت',t:'t',    isolated:'ت', initial:'تـ', medial:'ـتـ',final:'ـت', hint:"Like 't' in 'table'",        word:'تمر (tamr) = dates'},
-      {id:3, name:'Tha',   ar:'ث',t:'th',   isolated:'ث', initial:'ثـ', medial:'ـثـ',final:'ـث', hint:"Like 'th' in 'think'",       word:'ثعلب (thaʿlab) = fox'},
-      {id:4, name:'Jeem',  ar:'ج',t:'j',    isolated:'ج', initial:'جـ', medial:'ـجـ',final:'ـج', hint:"Like 'j' in 'jam'",          word:'جبل (jabal) = mountain'},
-      {id:5, name:'Ha',    ar:'ح',t:'ḥ',    isolated:'ح', initial:'حـ', medial:'ـحـ',final:'ـح', hint:"Breathy H from the throat",   word:'حجر (ḥajar) = stone'},
-      {id:6, name:'Kha',   ar:'خ',t:'kh',   isolated:'خ', initial:'خـ', medial:'ـخـ',final:'ـخ', hint:"Like 'ch' in Scottish 'loch'",word:'خبز (khubz) = bread'},
-      {id:7, name:'Dal',   ar:'د',t:'d',    isolated:'د', initial:'د',  medial:'ـد', final:'ـد', hint:"Like 'd' in 'door'",          word:'دار (dār) = home'},
-      {id:8, name:'Thal',  ar:'ذ',t:'dh',   isolated:'ذ', initial:'ذ',  medial:'ـذ', final:'ـذ', hint:"Like 'th' in 'that'",         word:'ذهب (dhahab) = gold'},
-      {id:9, name:'Ra',    ar:'ر',t:'r',    isolated:'ر', initial:'ر',  medial:'ـر', final:'ـر', hint:"Rolled 'r' sound",            word:'رمل (raml) = sand'},
-      {id:10,name:'Zay',   ar:'ز',t:'z',    isolated:'ز', initial:'ز',  medial:'ـز', final:'ـز', hint:"Like 'z' in 'zero'",          word:'زيت (zayt) = oil'},
-      {id:11,name:'Seen',  ar:'س',t:'s',    isolated:'س', initial:'سـ', medial:'ـسـ',final:'ـس', hint:"Like 's' in 'sun'",           word:'سيف (sayf) = sword'},
-      {id:12,name:'Sheen', ar:'ش',t:'sh',   isolated:'ش', initial:'شـ', medial:'ـشـ',final:'ـش', hint:"Like 'sh' in 'ship'",         word:'شمس (shams) = sun'},
-      {id:13,name:'Sad',   ar:'ص',t:'ṣ',    isolated:'ص', initial:'صـ', medial:'ـصـ',final:'ـص', hint:"Emphatic 's' — deeper",       word:'صخر (ṣakhr) = rock'},
-      {id:14,name:'Dad',   ar:'ض',t:'ḍ',    isolated:'ض', initial:'ضـ', medial:'ـضـ',final:'ـض', hint:"Unique Arabic emphatic D",    word:'ضوء (ḍawʾ) = light'},
-      {id:15,name:'Taa',   ar:'ط',t:'ṭ',    isolated:'ط', initial:'طـ', medial:'ـطـ',final:'ـط', hint:"Emphatic 't' — deeper",       word:'طريق (ṭarīq) = road'},
-      {id:16,name:'Dhaa',  ar:'ظ',t:'ẓ',    isolated:'ظ', initial:'ظـ', medial:'ـظـ',final:'ـظ', hint:"Emphatic 'dh' sound",         word:'ظل (ẓill) = shadow'},
-      {id:17,name:'Ain',   ar:'ع',t:"'ain", isolated:'ع', initial:'عـ', medial:'ـعـ',final:'ـع', hint:"Guttural — squeeze the throat",word:"عين ('ayn) = eye"},
-      {id:18,name:'Ghain', ar:'غ',t:'gh',   isolated:'غ', initial:'غـ', medial:'ـغـ',final:'ـغ', hint:"Like French 'r' — gargled",   word:'غابة (ghāba) = forest'},
-      {id:19,name:'Fa',    ar:'ف',t:'f',    isolated:'ف', initial:'فـ', medial:'ـفـ',final:'ـف', hint:"Like 'f' in 'fan'",            word:'فأس (faʾs) = axe'},
-      {id:20,name:'Qaf',   ar:'ق',t:'q',    isolated:'ق', initial:'قـ', medial:'ـقـ',final:'ـق', hint:"Deep 'k' from the throat",    word:'قمر (qamar) = moon'},
-      {id:21,name:'Kaf',   ar:'ك',t:'k',    isolated:'ك', initial:'كـ', medial:'ـكـ',final:'ـك', hint:"Like 'k' in 'key'",            word:'كنز (kanz) = treasure'},
-      {id:22,name:'Lam',   ar:'ل',t:'l',    isolated:'ل', initial:'لـ', medial:'ـلـ',final:'ـل', hint:"Like 'l' in 'lamp'",           word:'ليل (layl) = night'},
-      {id:23,name:'Meem',  ar:'م',t:'m',    isolated:'م', initial:'مـ', medial:'ـمـ',final:'ـم', hint:"Like 'm' in 'moon'",           word:'ماء (māʾ) = water'},
-      {id:24,name:'Noon',  ar:'ن',t:'n',    isolated:'ن', initial:'نـ', medial:'ـنـ',final:'ـن', hint:"Like 'n' in 'night'",          word:'نار (nār) = fire'},
-      {id:25,name:'Haa',   ar:'ه',t:'h',    isolated:'ه', initial:'هـ', medial:'ـهـ',final:'ـه', hint:"Like 'h' in 'house'",          word:'هواء (hawāʾ) = air'},
-      {id:26,name:'Waw',   ar:'و',t:'w/oo', isolated:'و', initial:'و',  medial:'ـو', final:'ـو', hint:"'w' or 'oo' as in 'moon'",     word:'ورد (ward) = roses'},
-      {id:27,name:'Ya',    ar:'ي',t:'y/ee', isolated:'ي', initial:'يـ', medial:'ـيـ',final:'ـي', hint:"'y' or 'ee' as in 'tree'",     word:'يد (yad) = hand'},
-    ];
+const LETTERS = [
+  {id:0, name:'Alef', ar:'ا',t:'aa',   isolated:'ا',initial:'ا',  medial:'ـا', final:'ـا', hint:"Long 'a' like in 'father'",    word:'أسد (asad) = lion'},
+  {id:1, name:'Ba',   ar:'ب',t:'b',    isolated:'ب',initial:'بـ', medial:'ـبـ',final:'ـب', hint:"Like 'b' in 'boy'",            word:'بيت (bayt) = house'},
+  {id:2, name:'Ta',   ar:'ت',t:'t',    isolated:'ت',initial:'تـ', medial:'ـتـ',final:'ـت', hint:"Like 't' in 'table'",          word:'تمر (tamr) = dates'},
+  {id:3, name:'Tha',  ar:'ث',t:'th',   isolated:'ث',initial:'ثـ', medial:'ـثـ',final:'ـث', hint:"Like 'th' in 'think'",         word:'ثعلب (thaʿlab) = fox'},
+  {id:4, name:'Jeem', ar:'ج',t:'j',    isolated:'ج',initial:'جـ', medial:'ـجـ',final:'ـج', hint:"Like 'j' in 'jam'",            word:'جبل (jabal) = mountain'},
+  {id:5, name:'Ha',   ar:'ح',t:'ḥ',    isolated:'ح',initial:'حـ', medial:'ـحـ',final:'ـح', hint:"Breathy H from the throat",    word:'حجر (ḥajar) = stone'},
+  {id:6, name:'Kha',  ar:'خ',t:'kh',   isolated:'خ',initial:'خـ', medial:'ـخـ',final:'ـخ', hint:"Like 'ch' in Scottish 'loch'", word:'خبز (khubz) = bread'},
+  {id:7, name:'Dal',  ar:'د',t:'d',    isolated:'د',initial:'د',  medial:'ـد', final:'ـد', hint:"Like 'd' in 'door'",           word:'دار (dār) = home'},
+  {id:8, name:'Thal', ar:'ذ',t:'dh',   isolated:'ذ',initial:'ذ',  medial:'ـذ', final:'ـذ', hint:"Like 'th' in 'that'",          word:'ذهب (dhahab) = gold'},
+  {id:9, name:'Ra',   ar:'ر',t:'r',    isolated:'ر',initial:'ر',  medial:'ـر', final:'ـر', hint:"Rolled 'r' sound",             word:'رمل (raml) = sand'},
+  {id:10,name:'Zay',  ar:'ز',t:'z',    isolated:'ز',initial:'ز',  medial:'ـز', final:'ـز', hint:"Like 'z' in 'zero'",           word:'زيت (zayt) = oil'},
+  {id:11,name:'Seen', ar:'س',t:'s',    isolated:'س',initial:'سـ', medial:'ـسـ',final:'ـس', hint:"Like 's' in 'sun'",            word:'سيف (sayf) = sword'},
+  {id:12,name:'Sheen',ar:'ش',t:'sh',   isolated:'ش',initial:'شـ', medial:'ـشـ',final:'ـش', hint:"Like 'sh' in 'ship'",          word:'شمس (shams) = sun'},
+  {id:13,name:'Sad',  ar:'ص',t:'ṣ',    isolated:'ص',initial:'صـ', medial:'ـصـ',final:'ـص', hint:"Emphatic 's' — deeper",        word:'صخر (ṣakhr) = rock'},
+  {id:14,name:'Dad',  ar:'ض',t:'ḍ',    isolated:'ض',initial:'ضـ', medial:'ـضـ',final:'ـض', hint:"Unique Arabic emphatic D",     word:'ضوء (ḍawʾ) = light'},
+  {id:15,name:'Taa',  ar:'ط',t:'ṭ',    isolated:'ط',initial:'طـ', medial:'ـطـ',final:'ـط', hint:"Emphatic 't' — deeper",        word:'طريق (ṭarīq) = road'},
+  {id:16,name:'Dhaa', ar:'ظ',t:'ẓ',    isolated:'ظ',initial:'ظـ', medial:'ـظـ',final:'ـظ', hint:"Emphatic 'dh' sound",          word:'ظل (ẓill) = shadow'},
+  {id:17,name:'Ain',  ar:'ع',t:"'ain", isolated:'ع',initial:'عـ', medial:'ـعـ',final:'ـع', hint:"Guttural — squeeze the throat", word:"عين ('ayn) = eye"},
+  {id:18,name:'Ghain',ar:'غ',t:'gh',   isolated:'غ',initial:'غـ', medial:'ـغـ',final:'ـغ', hint:"Like French 'r' — gargled",    word:'غابة (ghāba) = forest'},
+  {id:19,name:'Fa',   ar:'ف',t:'f',    isolated:'ف',initial:'فـ', medial:'ـفـ',final:'ـف', hint:"Like 'f' in 'fan'",            word:'فأس (faʾs) = axe'},
+  {id:20,name:'Qaf',  ar:'ق',t:'q',    isolated:'ق',initial:'قـ', medial:'ـقـ',final:'ـق', hint:"Deep 'k' from the throat",     word:'قمر (qamar) = moon'},
+  {id:21,name:'Kaf',  ar:'ك',t:'k',    isolated:'ك',initial:'كـ', medial:'ـكـ',final:'ـك', hint:"Like 'k' in 'key'",            word:'كنز (kanz) = treasure'},
+  {id:22,name:'Lam',  ar:'ل',t:'l',    isolated:'ل',initial:'لـ', medial:'ـلـ',final:'ـل', hint:"Like 'l' in 'lamp'",           word:'ليل (layl) = night'},
+  {id:23,name:'Meem', ar:'م',t:'m',    isolated:'م',initial:'مـ', medial:'ـمـ',final:'ـم', hint:"Like 'm' in 'moon'",           word:'ماء (māʾ) = water'},
+  {id:24,name:'Noon', ar:'ن',t:'n',    isolated:'ن',initial:'نـ', medial:'ـنـ',final:'ـن', hint:"Like 'n' in 'night'",          word:'نار (nār) = fire'},
+  {id:25,name:'Haa',  ar:'ه',t:'h',    isolated:'ه',initial:'هـ', medial:'ـهـ',final:'ـه', hint:"Like 'h' in 'house'",          word:'هواء (hawāʾ) = air'},
+  {id:26,name:'Waw',  ar:'و',t:'w/oo', isolated:'و',initial:'و',  medial:'ـو', final:'ـو', hint:"'w' or 'oo' as in 'moon'",     word:'ورد (ward) = roses'},
+  {id:27,name:'Ya',   ar:'ي',t:'y/ee', isolated:'ي',initial:'يـ', medial:'ـيـ',final:'ـي', hint:"'y' or 'ee' as in 'tree'",     word:'يد (yad) = hand'},
+];
 
-    const MATS = [
-      {name:'Wood',     emoji:'🪵',color:'#C68642',minXP:0},
-      {name:'Stone',    emoji:'🪨',color:'#909090',minXP:100},
-      {name:'Iron',     emoji:'⚙️', color:'#D4D4D4',minXP:300},
-      {name:'Gold',     emoji:'🥇',color:'#FFD700',minXP:600},
-      {name:'Diamond',  emoji:'💎',color:'#4DE8E8',minXP:1000},
-      {name:'Netherite',emoji:'🖤',color:'#BBBBBB',minXP:2000},
-    ];
+// letter ids: 0=Alef 1=Ba 2=Ta 3=Tha 4=Jeem 5=Ha 6=Kha 7=Dal 8=Thal 9=Ra 10=Zay
+//             11=Seen 12=Sheen 13=Sad 14=Dad 15=Taa 16=Dhaa 17=Ain 18=Ghain 19=Fa 20=Qaf
+//             21=Kaf 22=Lam 23=Meem 24=Noon 25=Haa 26=Waw 27=Ya
+const WORDS = [
+  // ── MINECRAFT THEMED (15) ─────────────────────────────────
+  {id:0, ar:'نار',   t:'nār',    en:'Fire',     emoji:'🔥', theme:'minecraft', letters:[24,0,9]},
+  {id:1, ar:'ماء',   t:'māʾ',    en:'Water',    emoji:'💧', theme:'minecraft', letters:[23,0]},
+  {id:2, ar:'سيف',   t:'sayf',   en:'Sword',    emoji:'⚔️', theme:'minecraft', letters:[11,27,19]},
+  {id:3, ar:'حجر',   t:'ḥajar',  en:'Stone',    emoji:'🪨', theme:'minecraft', letters:[5,4,9]},
+  {id:4, ar:'ذهب',   t:'dhahab', en:'Gold',     emoji:'🥇', theme:'minecraft', letters:[8,25,1]},
+  {id:5, ar:'كنز',   t:'kanz',   en:'Treasure', emoji:'💎', theme:'minecraft', letters:[21,24,10]},
+  {id:6, ar:'ليل',   t:'layl',   en:'Night',    emoji:'🌙', theme:'minecraft', letters:[22,27]},
+  {id:7, ar:'قمر',   t:'qamar',  en:'Moon',     emoji:'🌕', theme:'minecraft', letters:[20,23,9]},
+  {id:8, ar:'شمس',   t:'shams',  en:'Sun',      emoji:'☀️', theme:'minecraft', letters:[12,23,11]},
+  {id:9, ar:'فأس',   t:'faʾs',   en:'Axe',      emoji:'🪓', theme:'minecraft', letters:[19,0,11]},
+  {id:10,ar:'باب',   t:'bāb',    en:'Door',     emoji:'🚪', theme:'minecraft', letters:[1,0]},
+  {id:11,ar:'سهم',   t:'sahm',   en:'Arrow',    emoji:'🏹', theme:'minecraft', letters:[11,25,23]},
+  {id:12,ar:'درع',   t:'dirʿ',   en:'Armor',    emoji:'🛡️', theme:'minecraft', letters:[7,9,17]},
+  {id:13,ar:'صخر',   t:'ṣakhr',  en:'Rock',     emoji:'🪨', theme:'minecraft', letters:[13,6,9]},
+  {id:14,ar:'نهر',   t:'nahr',   en:'River',    emoji:'🌊', theme:'minecraft', letters:[24,25,9]},
+  // ── DAILY LIFE / MSA (15) ─────────────────────────────────
+  {id:15,ar:'بيت',   t:'bayt',   en:'House',    emoji:'🏠', theme:'daily', letters:[1,27,2]},
+  {id:16,ar:'كتاب',  t:'kitāb',  en:'Book',     emoji:'📚', theme:'daily', letters:[21,2,0,1]},
+  {id:17,ar:'يد',    t:'yad',    en:'Hand',     emoji:'✋', theme:'daily', letters:[27,7]},
+  {id:18,ar:'عين',   t:'ʿayn',   en:'Eye',      emoji:'👁️', theme:'daily', letters:[17,27,24]},
+  {id:19,ar:'قلب',   t:'qalb',   en:'Heart',    emoji:'❤️', theme:'daily', letters:[20,22,1]},
+  {id:20,ar:'نور',   t:'nūr',    en:'Light',    emoji:'✨', theme:'daily', letters:[24,26,9]},
+  {id:21,ar:'سلام',  t:'salām',  en:'Peace',    emoji:'🕊️', theme:'daily', letters:[11,22,0,23]},
+  {id:22,ar:'جبل',   t:'jabal',  en:'Mountain', emoji:'⛰️', theme:'daily', letters:[4,1,22]},
+  {id:23,ar:'بحر',   t:'baḥr',   en:'Sea',      emoji:'🌊', theme:'daily', letters:[1,5,9]},
+  {id:24,ar:'فجر',   t:'fajr',   en:'Dawn',     emoji:'🌅', theme:'daily', letters:[19,4,9]},
+  {id:25,ar:'نهار',  t:'nahār',  en:'Daytime',  emoji:'☀️', theme:'daily', letters:[24,25,0,9]},
+  {id:26,ar:'خبز',   t:'khubz',  en:'Bread',    emoji:'🍞', theme:'daily', letters:[6,1,10]},
+  {id:27,ar:'كلام',  t:'kalām',  en:'Speech',   emoji:'💬', theme:'daily', letters:[21,22,0,23]},
+  {id:28,ar:'رأس',   t:'raʾs',   en:'Head',     emoji:'🗣️', theme:'daily', letters:[9,0,11]},
+  {id:29,ar:'شجر',   t:'shajar', en:'Tree',     emoji:'🌳', theme:'daily', letters:[12,4,9]},
+];
 
-    const C = {
-      bg:'#0b1219',panel:'rgba(0,0,0,0.82)',bD:'#3a4a5a',bL:'#6a8a9a',
-      grass:'#4a7c3f',grassL:'#5fa34f',stone:'#555568',nether:'#cc4422',
-      gold:'#FFD700',emerald:'#1aee6a',heart:'#ff3333',xp:'#7CFC00',
-      diamond:'#3dd9d9',dim:'#8899aa',correct:'#2d6b28',wrong:'#7a1111',opt:'#15253a',
-    };
+const MATS=[
+  {name:'Wood',     emoji:'🪵',color:'#C68642',minXP:0},
+  {name:'Stone',    emoji:'🪨',color:'#909090',minXP:100},
+  {name:'Iron',     emoji:'⚙️', color:'#D4D4D4',minXP:300},
+  {name:'Gold',     emoji:'🥇',color:'#FFD700',minXP:600},
+  {name:'Diamond',  emoji:'💎',color:'#4DE8E8',minXP:1000},
+  {name:'Netherite',emoji:'🖤',color:'#BBBBBB',minXP:2000},
+];
 
-    // ── HELPERS ──────────────────────────────────────────────────
-    const getMat = xp => { let m=MATS[0]; for(const x of MATS) if(xp>=x.minXP) m=x; return m; };
-    const shuffle = a => [...a].sort(()=>Math.random()-.5);
-    const wrongs = (l,n=3) => shuffle(LETTERS.filter(x=>x.id!==l.id)).slice(0,n);
-    const dk = h => {
-      const n=parseInt(h.replace('#',''),16);
-      return `rgb(${Math.max(0,(n>>16)-55)},${Math.max(0,((n>>8)&255)-55)},${Math.max(0,(n&255)-55)})`;
-    };
+const C={
+  bg:'#0b1219',panel:'rgba(0,0,0,0.82)',bD:'#3a4a5a',bL:'#6a8a9a',
+  grass:'#4a7c3f',grassL:'#5fa34f',stone:'#555568',nether:'#cc4422',
+  mine:'#8B6914',mineL:'#c49a1e',
+  gold:'#FFD700',emerald:'#1aee6a',heart:'#ff3333',xp:'#7CFC00',
+  diamond:'#3dd9d9',dim:'#8899aa',correct:'#2d6b28',wrong:'#7a1111',opt:'#15253a',
+};
 
-    // ── SPACED REPETITION ────────────────────────────────────────
-    // Score each letter: higher score = needs more practice
-    // Factors: error rate (60%), recency (25%), unseen bonus (15%)
-    const scoreLetter = (letter, stats, now) => {
-      const s = stats[letter.id];
-      if (!s || s.total === 0) return 100 + Math.random() * 20; // never seen → top priority
-      const errorRate = s.wrong / s.total;
-      const daysSince = s.lastSeen ? (now - s.lastSeen) / 86400000 : 999;
-      const recencyScore = Math.min(daysSince * 15, 60);
-      return (errorRate * 60) + recencyScore + (Math.random() * 8);
-    };
+// ── HELPERS ───────────────────────────────────────────────────────
+const getMat = xp=>{let m=MATS[0];for(const x of MATS)if(xp>=x.minXP)m=x;return m;};
+const shuffle = a=>[...a].sort(()=>Math.random()-.5);
+const wrongLetters = (l,n=3)=>shuffle(LETTERS.filter(x=>x.id!==l.id)).slice(0,n);
+const wrongWords = (w,pool,n=3)=>shuffle(pool.filter(x=>x.id!==w.id)).slice(0,n);
+const dk = h=>{const n=parseInt(h.replace('#',''),16);return `rgb(${Math.max(0,(n>>16)-55)},${Math.max(0,((n>>8)&255)-55)},${Math.max(0,(n&255)-55)})`;};
 
-    const selectLetters = (mastered, stats, count=6) => {
-      const now = Date.now();
-      // Sort all letters by score descending
-      const scored = LETTERS.map(l => ({ l, score: scoreLetter(l, stats, now) }))
-        .sort((a,b) => b.score - a.score);
-      // Always include some unmastered letters at top
-      const unmastered = scored.filter(x => !mastered.includes(x.l.id));
-      const masteredL  = scored.filter(x =>  mastered.includes(x.l.id));
-      // Pick: mostly unmastered (prioritise learning), some review
-      const pool = [...unmastered.slice(0,4), ...masteredL.slice(0,2)];
-      if (pool.length < count) pool.push(...scored.slice(0, count - pool.length));
-      return pool.slice(0, count).map(x => x.l);
-    };
+// ── WORD AVAILABILITY ─────────────────────────────────────────────
+// A word is available if ALL its letters are in mastered set
+const getAvailableWords = mastered =>
+  WORDS.filter(w => w.letters.every(lid => mastered.includes(lid)));
 
-    // ── EXERCISE BUILDER ─────────────────────────────────────────
-    const buildEx = (letter, form) => {
-      const type = ['name','arabic','form'][Math.floor(Math.random()*3)];
-      if (type==='name') {
-        const opts = shuffle([letter,...wrongs(letter)]).map(l=>({
-          id:l.id, display:l.name, sub:`(${l.t})`, isArabic:false, isCorrect:l.id===letter.id
-        }));
-        return {type, letterId:letter.id, qAr:letter[form], qText:'What letter is this?', qSub:`${form} form`, opts};
-      }
-      if (type==='arabic') {
-        const opts = shuffle([letter,...wrongs(letter)]).map(l=>({
-          id:l.id, display:l.isolated, isArabic:true, isCorrect:l.id===letter.id
-        }));
-        return {type, letterId:letter.id, qAr:null, qText:'Find the letter:', qBig:`${letter.name} (${letter.t})`, qSub:letter.hint, opts};
-      }
-      const opts = FORM_NAMES.map(f=>({id:f, display:f[0].toUpperCase()+f.slice(1), isArabic:false, isCorrect:f===form}));
-      return {type, letterId:letter.id, qAr:letter[form], qText:`Which form of "${letter.name}"?`, opts};
-    };
+// ── SPACED REPETITION ─────────────────────────────────────────────
+const scoreItem = (id, stats, now) => {
+  const s = stats[id];
+  if (!s || s.total===0) return 100+Math.random()*20;
+  const errorRate = s.wrong/s.total;
+  const daysSince = s.lastSeen ? (now-s.lastSeen)/86400000 : 999;
+  return (errorRate*60) + (Math.min(daysSince*15,60)) + (Math.random()*8);
+};
 
-    const buildSession = (mastered, stats) => {
-      const sel = selectLetters(mastered, stats, 6);
-      const exs = [];
-      sel.forEach(letter => {
-        const f1 = FORM_NAMES[Math.floor(Math.random()*4)];
-        const f2 = FORM_NAMES[(FORM_NAMES.indexOf(f1)+2)%4];
-        exs.push(buildEx(letter, f1));
-        exs.push(buildEx(letter, f2));
-      });
-      return { exercises: shuffle(exs).slice(0,12), sessionLetters: sel };
-    };
+const selectLetters = (mastered, stats, count=6) => {
+  const now = Date.now();
+  const scored = LETTERS.map(l=>({l,score:scoreItem(l.id,stats,now)}))
+    .sort((a,b)=>b.score-a.score);
+  const unmastered = scored.filter(x=>!mastered.includes(x.l.id));
+  const masteredL  = scored.filter(x=> mastered.includes(x.l.id));
+  const pool = [...unmastered.slice(0,4),...masteredL.slice(0,2)];
+  if(pool.length<count) pool.push(...scored.slice(0,count-pool.length));
+  return pool.slice(0,count).map(x=>x.l);
+};
 
-    // ── LOCAL STORAGE ────────────────────────────────────────────
-    const defaultPlayer = () => ({
-      xp:0, hearts:5, emeralds:0, streak:0,
-      mastered:[], dailyDone:false, placementDone:false,
-      lastPlayDate: null,
-    });
-    const defaultStats = () => ({});
+const selectWords = (mastered, wordStats, count=6) => {
+  const now = Date.now();
+  const available = getAvailableWords(mastered);
+  if (available.length===0) return [];
+  const scored = available.map(w=>({w,score:scoreItem(w.id,wordStats,now)}))
+    .sort((a,b)=>b.score-a.score);
+  return scored.slice(0,count).map(x=>x.w);
+};
 
-    const loadSave = () => {
-      try {
-        const raw = localStorage.getItem(SAVE_KEY);
-        if (!raw) return { player: defaultPlayer(), stats: defaultStats() };
-        const s = JSON.parse(raw);
-        return {
-          player: { ...defaultPlayer(), ...s.player },
-          stats:  s.stats || defaultStats(),
-        };
-      } catch(e) { return { player: defaultPlayer(), stats: defaultStats() }; }
-    };
+// ── LETTER EXERCISE BUILDER ───────────────────────────────────────
+const buildLetterEx = (letter, form) => {
+  const type=['name','arabic','form'][Math.floor(Math.random()*3)];
+  if(type==='name'){
+    const opts=shuffle([letter,...wrongLetters(letter)]).map(l=>({id:l.id,display:l.name,sub:`(${l.t})`,isArabic:false,isCorrect:l.id===letter.id}));
+    return {type,letterId:letter.id,qAr:letter[form],qText:'What letter is this?',qSub:`${form} form`,opts};
+  }
+  if(type==='arabic'){
+    const opts=shuffle([letter,...wrongLetters(letter)]).map(l=>({id:l.id,display:l.isolated,isArabic:true,isCorrect:l.id===letter.id}));
+    return {type,letterId:letter.id,qAr:null,qText:'Find the letter:',qBig:`${letter.name} (${letter.t})`,qSub:letter.hint,opts};
+  }
+  const opts=FORM_NAMES.map(f=>({id:f,display:f[0].toUpperCase()+f.slice(1),isArabic:false,isCorrect:f===form}));
+  return {type,letterId:letter.id,qAr:letter[form],qText:`Which form of "${letter.name}"?`,opts};
+};
 
-    const writeSave = (player, stats) => {
-      try { localStorage.setItem(SAVE_KEY, JSON.stringify({ player, stats })); } catch(e){}
-    };
+const buildLetterSession = (mastered, stats) => {
+  const sel = selectLetters(mastered, stats, 6);
+  const exs = [];
+  sel.forEach(letter=>{
+    const f1=FORM_NAMES[Math.floor(Math.random()*4)];
+    const f2=FORM_NAMES[(FORM_NAMES.indexOf(f1)+2)%4];
+    exs.push(buildLetterEx(letter,f1));
+    exs.push(buildLetterEx(letter,f2));
+  });
+  return {exercises:shuffle(exs).slice(0,12), sessionItems:sel};
+};
 
-    // ── STYLE HELPERS ─────────────────────────────────────────────
-    const pn = (e={}) => ({
-      background:C.panel, border:`3px solid ${C.bD}`,
-      borderTop:`3px solid ${C.bL}`, borderLeft:`3px solid ${C.bL}`,
-      padding:'14px', ...e
-    });
-    const bt = (bg, e={}) => ({
-      fontFamily:PX, background:bg, color:'#fff', border:'none',
-      borderBottom:`4px solid ${dk(bg)}`, borderRight:`4px solid ${dk(bg)}`,
-      borderTop:'2px solid rgba(255,255,255,0.13)', borderLeft:'2px solid rgba(255,255,255,0.13)',
-      padding:'12px 14px', cursor:'pointer', fontSize:'9px',
-      textShadow:'1px 1px 0 rgba(0,0,0,0.8)', width:'100%',
-      textAlign:'center', letterSpacing:'0.5px', lineHeight:'1.6', ...e
-    });
+// ── WORD EXERCISE BUILDER ─────────────────────────────────────────
+const buildWordEx = (word, pool) => {
+  const type=['meaning','arabic','start'][Math.floor(Math.random()*3)];
+  const wp = wrongWords(word, pool);
+  if (type==='meaning') {
+    const opts = shuffle([
+      {id:word.id, display:word.en,  isArabic:false, isCorrect:true},
+      ...wp.map(w=>({id:w.id, display:w.en, isArabic:false, isCorrect:false}))
+    ]);
+    return {type,wordId:word.id,qAr:word.ar,qText:'What does this word mean?',qSub:`/${word.t}/`,opts};
+  }
+  if (type==='arabic') {
+    const opts = shuffle([
+      {id:word.id, display:word.ar, isArabic:true, isCorrect:true},
+      ...wp.map(w=>({id:w.id, display:w.ar, isArabic:true, isCorrect:false}))
+    ]);
+    return {type,wordId:word.id,qAr:null,qText:'Find the Arabic word:',qBig:`${word.emoji} ${word.en}`,qSub:`/${word.t}/`,opts};
+  }
+  // 'start' — which letter does this word START with?
+  const startLetterId = word.letters[0];
+  const startLetter   = LETTERS.find(l=>l.id===startLetterId);
+  const wrongLtrs     = shuffle(LETTERS.filter(l=>l.id!==startLetterId)).slice(0,3);
+  const opts = shuffle([
+    {id:startLetter.id, display:startLetter.isolated, sub:startLetter.name, isArabic:true, isCorrect:true},
+    ...wrongLtrs.map(l=>({id:l.id, display:l.isolated, sub:l.name, isArabic:true, isCorrect:false}))
+  ]);
+  return {type,wordId:word.id,qAr:word.ar,qText:'Which letter does this start with?',qSub:`${word.emoji} ${word.en}`,opts};
+};
 
-    const PBar = ({value,max,color=C.xp,h=8}) => (
-      <div style={{background:'#111',height:h,border:`2px solid ${C.bD}`}}>
-        <div style={{width:`${Math.min(100,max>0?(value/max)*100:0)}%`,height:'100%',background:color,transition:'width .4s ease'}}/>
+const buildWordSession = (mastered, wordStats) => {
+  const sel = selectWords(mastered, wordStats, 6);
+  if (sel.length===0) return {exercises:[], sessionItems:[]};
+  const pool = getAvailableWords(mastered);
+  const exs = [];
+  sel.forEach(word=>{
+    exs.push(buildWordEx(word, pool.length>=4?pool:[...pool,...WORDS].slice(0,4)));
+    exs.push(buildWordEx(word, pool.length>=4?pool:[...pool,...WORDS].slice(0,4)));
+  });
+  return {exercises:shuffle(exs).slice(0,12), sessionItems:sel};
+};
+
+// ── LOCAL STORAGE ─────────────────────────────────────────────────
+const defaultPlayer = ()=>({xp:0,hearts:5,emeralds:0,streak:0,mastered:[],dailyDone:false,placementDone:false,lastPlayDate:null});
+const loadSave = ()=>{
+  try{
+    const raw=localStorage.getItem(SAVE_KEY);
+    if(!raw) return {player:defaultPlayer(),letterStats:{},wordStats:{}};
+    const s=JSON.parse(raw);
+    return {player:{...defaultPlayer(),...s.player},letterStats:s.letterStats||{},wordStats:s.wordStats||{}};
+  }catch(e){return {player:defaultPlayer(),letterStats:{},wordStats:{}};}
+};
+const writeSave=(player,letterStats,wordStats)=>{
+  try{localStorage.setItem(SAVE_KEY,JSON.stringify({player,letterStats,wordStats}));}catch(e){}
+};
+
+// ── STYLE HELPERS ─────────────────────────────────────────────────
+const pn=(e={})=>({background:C.panel,border:`3px solid ${C.bD}`,borderTop:`3px solid ${C.bL}`,borderLeft:`3px solid ${C.bL}`,padding:'14px',...e});
+const bt=(bg,e={})=>({fontFamily:PX,background:bg,color:'#fff',border:'none',borderBottom:`4px solid ${dk(bg)}`,borderRight:`4px solid ${dk(bg)}`,borderTop:'2px solid rgba(255,255,255,0.13)',borderLeft:'2px solid rgba(255,255,255,0.13)',padding:'12px 14px',cursor:'pointer',fontSize:'9px',textShadow:'1px 1px 0 rgba(0,0,0,0.8)',width:'100%',textAlign:'center',letterSpacing:'0.5px',lineHeight:'1.6',...e});
+
+const PBar=({value,max,color=C.xp,h=8})=>(
+  <div style={{background:'#111',height:h,border:`2px solid ${C.bD}`}}>
+    <div style={{width:`${Math.min(100,max>0?(value/max)*100:0)}%`,height:'100%',background:color,transition:'width .4s ease'}}/>
+  </div>
+);
+const Hearts=({cur,max=5})=>(
+  <div style={{display:'flex',gap:'2px'}}>
+    {Array.from({length:max}).map((_,i)=><span key={i} style={{fontSize:'14px',opacity:i<cur?1:.2,transition:'opacity .3s'}}>❤️</span>)}
+  </div>
+);
+
+// ── STATS BAR (shared) ────────────────────────────────────────────
+const StatsBar = ({player}) => {
+  const mat = getMat(player.xp);
+  return (
+    <div style={{...pn({marginBottom:'14px'})}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div><div style={{color:mat.color,fontSize:'8px'}}>{mat.emoji} {mat.name}</div><div style={{color:C.dim,fontSize:'6px',marginTop:'2px'}}>{player.xp} XP</div></div>
+        <div style={{textAlign:'center'}}><div style={{color:'#FF8C00',fontSize:'9px'}}>🔥 {player.streak}</div><div style={{color:C.dim,fontSize:'6px'}}>streak</div></div>
+        <div style={{textAlign:'right'}}><div style={{color:C.emerald,fontSize:'8px',marginBottom:'2px'}}>💎 {player.emeralds}</div><Hearts cur={player.hearts} max={5}/></div>
       </div>
-    );
+    </div>
+  );
+};
 
-    const Hearts = ({cur,max=5}) => (
-      <div style={{display:'flex',gap:'2px'}}>
-        {Array.from({length:max}).map((_,i)=>(
-          <span key={i} style={{fontSize:'14px',opacity:i<cur?1:.2,transition:'opacity .3s'}}>❤️</span>
+// ── HOME ──────────────────────────────────────────────────────────
+function Home({player, onPlace, onContinue}) {
+  const mat = getMat(player.xp);
+  const isNew = !player.placementDone;
+  return (
+    <div style={{minHeight:'100vh',fontFamily:PX,background:`linear-gradient(180deg,#0a1628 0%,#0a1628 52%,${C.grass} 52%,${C.grass} 63%,#5c2e0e 63%)`,display:'flex',flexDirection:'column',alignItems:'center',padding:'28px 18px',position:'relative',overflow:'hidden'}}>
+      {[[12,8],[28,14],[55,6],[72,18],[88,10],[40,22],[65,28],[18,30]].map(([x,y],i)=>(
+        <div key={i} style={{position:'absolute',left:`${x}%`,top:`${y}%`,width:i%2?'2px':'4px',height:i%2?'2px':'4px',background:'white',opacity:.7}}/>
+      ))}
+      <div style={{position:'relative',zIndex:1,width:'100%',maxWidth:'360px',display:'flex',flexDirection:'column',alignItems:'center'}}>
+        <div style={{fontSize:'22px',color:C.gold,textShadow:'3px 3px 0 #000,-1px 0 0 #000',textAlign:'center',marginBottom:'4px'}}>⛏ ARABIC QUEST</div>
+        <div style={{fontSize:'7px',color:'#99ccff',textShadow:'1px 1px 0 #000',marginBottom:'32px',textAlign:'center'}}>Mine Arabic. Craft Knowledge.</div>
+        <div className="glow" style={{width:'72px',height:'72px',background:C.grass,border:'4px solid #2d4d1e',boxShadow:'4px 4px 0 #1a2e10',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'36px',marginBottom:'28px'}}>👾</div>
+        {!isNew&&(
+          <div className="slide-up" style={{...pn({marginBottom:'18px',width:'100%'})}}>
+            <div style={{color:mat.color,fontSize:'8px',marginBottom:'8px'}}>{mat.emoji} {mat.name} Explorer</div>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:'8px'}}>
+              <span style={{color:C.dim,fontSize:'7px'}}>XP: <span style={{color:C.xp}}>{player.xp}</span></span>
+              <span style={{color:C.dim,fontSize:'7px'}}>💎 <span style={{color:C.emerald}}>{player.emeralds}</span></span>
+              <span style={{color:C.dim,fontSize:'7px'}}>🔥 <span style={{color:'#FF8C00'}}>{player.streak}d</span></span>
+            </div>
+            <div style={{color:C.dim,fontSize:'6px',marginBottom:'4px'}}>Letters mastered: {player.mastered.length}/28</div>
+            <PBar value={player.mastered.length} max={28} color={C.diamond} h={6}/>
+          </div>
+        )}
+        <div style={{display:'flex',flexDirection:'column',gap:'10px',width:'100%'}}>
+          {isNew
+            ?<button style={bt(C.grass)} onClick={onPlace}>🗺️ START YOUR ADVENTURE</button>
+            :<>
+              <button style={bt(C.grass)} onClick={onContinue}>▶ CONTINUE QUEST</button>
+              <button style={bt(C.stone,{fontSize:'7px'})} onClick={onPlace}>📋 RETAKE PLACEMENT TEST</button>
+            </>}
+        </div>
+        {player.streak>0&&<div style={{marginTop:'20px',color:'#FF8C00',fontSize:'7px',textAlign:'center'}}>🔥 {player.streak} DAY SURVIVAL STREAK! Don't break it!</div>}
+        {!isNew&&<div style={{marginTop:'10px',color:'#1a3a1a',fontSize:'6px',textAlign:'center'}}>💾 Progress saved automatically</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── PLACEMENT ─────────────────────────────────────────────────────
+function Placement({onDone}) {
+  const [qs]=useState(()=>shuffle(LETTERS).map(letter=>{
+    const form=FORM_NAMES[Math.floor(Math.random()*4)];
+    const opts=shuffle([letter,...wrongLetters(letter)]).map(l=>({id:l.id,display:l.name,sub:l.t,isCorrect:l.id===letter.id}));
+    return {letter,form,opts};
+  }));
+  const [idx,setIdx]=useState(0);
+  const [results,setResults]=useState({});
+  const [sel,setSel]=useState(null);
+  const [fb,setFb]=useState(null);
+  const q=qs[idx];
+  const pick=optId=>{
+    if(fb)return;
+    const ok=q.opts.find(o=>o.id===optId)?.isCorrect||false;
+    setSel(optId);setFb(ok?'ok':'no');
+    const nr={...results,[q.letter.id]:ok};setResults(nr);
+    setTimeout(()=>{if(idx+1>=qs.length)onDone(nr);else{setIdx(i=>i+1);setSel(null);setFb(null);}},700);
+  };
+  return (
+    <div style={{minHeight:'100vh',background:C.bg,padding:'18px',fontFamily:PX,display:'flex',flexDirection:'column'}}>
+      <div style={{marginBottom:'14px'}}>
+        <div style={{color:C.gold,fontSize:'9px',marginBottom:'6px'}}>📋 PLACEMENT TEST</div>
+        <div style={{color:C.dim,fontSize:'6px',marginBottom:'6px'}}>Letter {idx+1} of {qs.length} — all 28 letters</div>
+        <PBar value={idx} max={qs.length} color={C.gold} h={7}/>
+      </div>
+      <div className="slide-up" style={{...pn({flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',marginBottom:'16px',minHeight:'180px'})}}>
+        <div style={{color:C.dim,fontSize:'7px',marginBottom:'14px',textAlign:'center'}}>Which letter is this? <span style={{color:'#445'}}>({q.form} form)</span></div>
+        <div style={{fontSize:'86px',fontFamily:AR,color:'white',lineHeight:1,textAlign:'center',filter:fb==='ok'?'drop-shadow(0 0 14px #4de8e8)':'none',transition:'filter .3s'}}>{q.letter[q.form]}</div>
+        <div style={{color:'#2a3a2a',fontSize:'7px',marginTop:'12px'}}>Tap the correct name</div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+        {q.opts.map(opt=>{
+          let bg=C.opt;if(fb){if(opt.isCorrect)bg=C.correct;else if(opt.id===sel)bg=C.wrong;}
+          return(
+            <button key={opt.id} onClick={()=>pick(opt.id)} style={bt(bg,{padding:'14px 8px',lineHeight:1.8})}>
+              <div style={{fontSize:'8px'}}>{opt.display}</div>
+              <div style={{fontSize:'6px',color:'rgba(255,255,255,0.4)',marginTop:'2px'}}>({opt.sub})</div>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{marginTop:'14px',color:'#1a2a1a',fontSize:'6px',textAlign:'center'}}>This personalizes your learning journey</div>
+    </div>
+  );
+}
+
+// ── WORLD MAP ─────────────────────────────────────────────────────
+function WorldMap({player, letterStats, wordStats, onZone}) {
+  const availableWords = getAvailableWords(player.mastered);
+  const mineUnlocked   = player.mastered.length >= 10;
+  const zones=[
+    {id:'village', name:'THE VILLAGE', ar:'القرية',       emoji:'🏡', bg:C.grass,  locked:false,        note:`${player.mastered.length}/28 letters mastered`},
+    {id:'mine',    name:'THE MINE',    ar:'المنجم',       emoji:'⛏️', bg:C.mine,   locked:!mineUnlocked, note:!mineUnlocked?`Need 10 letters (${player.mastered.length}/10)`:`${availableWords.length} words unlocked`},
+    {id:'nether',  name:'THE NETHER', ar:'العالم الآخر', emoji:'🔥', bg:C.nether, locked:player.mastered.length<28, note:'Master all 28 letters first'},
+  ];
+
+  const weak = LETTERS.filter(l=>letterStats[l.id]&&letterStats[l.id].total>0)
+    .sort((a,b)=>{const sa=letterStats[a.id],sb=letterStats[b.id];return(sb.wrong/sb.total)-(sa.wrong/sa.total);})
+    .slice(0,3);
+
+  return (
+    <div style={{minHeight:'100vh',background:C.bg,padding:'18px',fontFamily:PX}}>
+      <StatsBar player={player}/>
+      <div style={{color:C.gold,fontSize:'10px',marginBottom:'4px'}}>🗺️ WORLD MAP</div>
+      <div style={{color:C.dim,fontSize:'6px',marginBottom:'14px'}}>Choose your zone, adventurer</div>
+      <div style={{...pn({marginBottom:'14px',borderColor:player.dailyDone?'#2d6b28':'#cc7700',borderTopColor:player.dailyDone?C.grassL:'#ffaa00'})}}>
+        {player.dailyDone
+          ?<div style={{color:C.grassL,fontSize:'7px'}}>✅ DAILY MISSION COMPLETE! See you tomorrow.</div>
+          :<><div style={{color:'#FF8C00',fontSize:'7px',marginBottom:'4px'}}>📜 DAILY MISSION ACTIVE</div><div style={{color:C.dim,fontSize:'6px'}}>Survive 15 minutes in Arabic World today!</div></>}
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'16px'}}>
+        {zones.map(z=>(
+          <button key={z.id} onClick={()=>!z.locked&&onZone(z.id)}
+            style={bt(z.locked?'#1a1a2a':z.bg,{padding:'14px',display:'flex',alignItems:'center',gap:'12px',opacity:z.locked?.45:1,cursor:z.locked?'not-allowed':'pointer',textAlign:'left'})}>
+            <span style={{fontSize:'26px',flexShrink:0}}>{z.locked?'🔒':z.emoji}</span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:'8px'}}>{z.name}</div>
+              <div style={{fontFamily:AR,fontSize:'13px',color:'rgba(255,255,255,0.5)',marginTop:'2px'}}>{z.ar}</div>
+              <div style={{fontSize:'6px',color:'rgba(255,255,255,0.35)',marginTop:'2px'}}>{z.note}</div>
+            </div>
+            {!z.locked&&<span>▶</span>}
+          </button>
         ))}
       </div>
-    );
+      {weak.length>0&&(
+        <div style={{...pn({marginBottom:'14px',borderColor:'#cc4400',borderTopColor:'#ff6622'})}}>
+          <div style={{color:'#ff6622',fontSize:'7px',marginBottom:'8px'}}>⚠️ LETTERS THAT NEED PRACTICE</div>
+          <div style={{display:'flex',gap:'8px'}}>
+            {weak.map(l=>(
+              <div key={l.id} style={{flex:1,background:'rgba(0,0,0,0.4)',border:'1px solid #333',padding:'8px',textAlign:'center'}}>
+                <div style={{fontFamily:AR,fontSize:'28px',color:'white',lineHeight:1,marginBottom:'4px'}}>{l.ar}</div>
+                <div style={{fontSize:'6px',color:C.dim}}>{l.name}</div>
+                <div style={{fontSize:'5px',color:'#ff6622',marginTop:'2px'}}>{Math.round((letterStats[l.id].wrong/letterStats[l.id].total)*100)}% errors</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <div style={pn()}>
+        <div style={{color:C.dim,fontSize:'6px',marginBottom:'8px'}}>LETTERS MASTERED</div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:'3px',marginBottom:'8px'}}>
+          {LETTERS.map(l=>{
+            const s=letterStats[l.id];
+            const errorRate=s&&s.total>0?s.wrong/s.total:0;
+            const isMastered=player.mastered.includes(l.id);
+            return(
+              <div key={l.id} title={l.name}
+                style={{width:'21px',height:'21px',fontFamily:AR,fontSize:'12px',
+                  background:isMastered?'#2d5a28':errorRate>0.5?'#3a1111':'#111',
+                  border:`1px solid ${isMastered?C.grassL:errorRate>0.5?'#aa2222':'#333'}`,
+                  display:'flex',alignItems:'center',justifyContent:'center',transition:'background .4s'}}>
+                {l.ar}
+              </div>
+            );
+          })}
+        </div>
+        <PBar value={player.mastered.length} max={28} color={C.diamond} h={6}/>
+        <div style={{color:C.dim,fontSize:'6px',marginTop:'4px'}}>🟩 mastered &nbsp;🟥 needs work &nbsp;⬛ not seen</div>
+      </div>
+    </div>
+  );
+}
 
-    // ── HOME ─────────────────────────────────────────────────────
-    function Home({player, onPlace, onContinue}) {
-      const mat = getMat(player.xp);
-      const isNew = !player.placementDone;
-      return (
-        <div style={{minHeight:'100vh',fontFamily:PX,
-          background:`linear-gradient(180deg,#0a1628 0%,#0a1628 52%,${C.grass} 52%,${C.grass} 63%,#5c2e0e 63%)`,
-          display:'flex',flexDirection:'column',alignItems:'center',padding:'28px 18px',position:'relative',overflow:'hidden'}}>
-          {[[12,8],[28,14],[55,6],[72,18],[88,10],[40,22],[65,28],[18,30]].map(([x,y],i)=>(
-            <div key={i} style={{position:'absolute',left:`${x}%`,top:`${y}%`,width:i%2?'2px':'4px',height:i%2?'2px':'4px',background:'white',opacity:.7}}/>
+// ── LETTER INTRO CARDS ────────────────────────────────────────────
+function LetterIntro({sessionItems, onDone}) {
+  const [idx,setIdx]=useState(0);
+  const letter=sessionItems[idx];
+  const isLast=idx===sessionItems.length-1;
+  return (
+    <div style={{minHeight:'100vh',background:'linear-gradient(180deg,#050e1a,#091a12)',padding:'18px',fontFamily:PX,display:'flex',flexDirection:'column'}}>
+      <div style={{marginBottom:'14px'}}>
+        <div style={{color:C.diamond,fontSize:'8px',marginBottom:'6px'}}>📖 LEARN BEFORE YOU QUEST</div>
+        <div style={{color:C.dim,fontSize:'6px',marginBottom:'6px'}}>Letter {idx+1} of {sessionItems.length}</div>
+        <PBar value={idx} max={sessionItems.length} color={C.diamond} h={6}/>
+      </div>
+      <div className="slide-up" key={letter.id} style={{...pn({flex:1,display:'flex',flexDirection:'column',alignItems:'center',marginBottom:'14px',padding:'20px 14px'})}}>
+        <div className="pop" style={{fontSize:'88px',fontFamily:AR,color:'white',lineHeight:1,textAlign:'center',textShadow:`0 0 30px ${C.diamond}55`,marginBottom:'8px'}}>{letter.isolated}</div>
+        <div style={{color:C.gold,fontSize:'13px',marginBottom:'2px'}}>{letter.name}</div>
+        <div style={{color:C.dim,fontSize:'7px',marginBottom:'16px'}}>/{letter.t}/</div>
+        <div style={{background:'rgba(0,50,100,0.3)',border:`1px solid ${C.bD}`,padding:'8px 12px',marginBottom:'16px',width:'100%',textAlign:'center'}}>
+          <div style={{color:'#99ccff',fontSize:'6px',lineHeight:1.8}}>{letter.hint}</div>
+        </div>
+        <div style={{color:C.dim,fontSize:'6px',marginBottom:'10px',alignSelf:'flex-start'}}>ALL 4 FORMS</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',width:'100%',marginBottom:'14px'}}>
+          {FORM_NAMES.map(form=>(
+            <div key={form} style={{background:'rgba(0,0,0,0.5)',border:`1px solid ${C.bD}`,padding:'10px',textAlign:'center'}}>
+              <div style={{fontFamily:AR,fontSize:'30px',color:'white',lineHeight:1,marginBottom:'4px'}}>{letter[form]}</div>
+              <div style={{fontSize:'6px',color:C.dim}}>{form}</div>
+            </div>
           ))}
-          <div style={{position:'relative',zIndex:1,width:'100%',maxWidth:'360px',display:'flex',flexDirection:'column',alignItems:'center'}}>
-            <div style={{fontSize:'22px',color:C.gold,textShadow:'3px 3px 0 #000,-1px 0 0 #000',textAlign:'center',marginBottom:'4px'}}>
-              ⛏ ARABIC QUEST
-            </div>
-            <div style={{fontSize:'7px',color:'#99ccff',textShadow:'1px 1px 0 #000',marginBottom:'32px',textAlign:'center'}}>
-              Mine Arabic. Craft Knowledge.
-            </div>
-            <div className="glow" style={{width:'72px',height:'72px',background:C.grass,border:'4px solid #2d4d1e',boxShadow:'4px 4px 0 #1a2e10',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'36px',marginBottom:'28px'}}>
-              👾
-            </div>
-            {!isNew && (
-              <div className="slide-up" style={{...pn({marginBottom:'18px',width:'100%'})}}>
-                <div style={{color:mat.color,fontSize:'8px',marginBottom:'8px'}}>{mat.emoji} {mat.name} Explorer</div>
-                <div style={{display:'flex',justifyContent:'space-between',marginBottom:'8px'}}>
-                  <span style={{color:C.dim,fontSize:'7px'}}>XP: <span style={{color:C.xp}}>{player.xp}</span></span>
-                  <span style={{color:C.dim,fontSize:'7px'}}>💎 <span style={{color:C.emerald}}>{player.emeralds}</span></span>
-                  <span style={{color:C.dim,fontSize:'7px'}}>🔥 <span style={{color:'#FF8C00'}}>{player.streak}d</span></span>
-                </div>
-                <div style={{color:C.dim,fontSize:'6px',marginBottom:'4px'}}>Letters mastered: {player.mastered.length}/28</div>
-                <PBar value={player.mastered.length} max={28} color={C.diamond} h={6}/>
-              </div>
-            )}
-            <div style={{display:'flex',flexDirection:'column',gap:'10px',width:'100%'}}>
-              {isNew
-                ? <button style={bt(C.grass)} onClick={onPlace}>🗺️ START YOUR ADVENTURE</button>
-                : <>
-                    <button style={bt(C.grass)} onClick={onContinue}>▶ CONTINUE QUEST</button>
-                    <button style={bt(C.stone,{fontSize:'7px'})} onClick={onPlace}>📋 RETAKE PLACEMENT TEST</button>
-                  </>}
-            </div>
-            {player.streak>0 && (
-              <div style={{marginTop:'20px',color:'#FF8C00',fontSize:'7px',textAlign:'center'}}>
-                🔥 {player.streak} DAY SURVIVAL STREAK! Don't break it!
-              </div>
-            )}
-            {!isNew && (
-              <div style={{marginTop:'12px',color:'#1a3a1a',fontSize:'6px',textAlign:'center'}}>
-                💾 Progress saved automatically
-              </div>
-            )}
-          </div>
         </div>
-      );
-    }
-
-    // ── PLACEMENT ────────────────────────────────────────────────
-    function Placement({onDone}) {
-      const [qs] = useState(()=>shuffle(LETTERS).map(letter=>{
-        const form = FORM_NAMES[Math.floor(Math.random()*4)];
-        const opts = shuffle([letter,...wrongs(letter)]).map(l=>({
-          id:l.id, display:l.name, sub:l.t, isCorrect:l.id===letter.id
-        }));
-        return {letter, form, opts};
-      }));
-      const [idx,setIdx]=useState(0);
-      const [results,setResults]=useState({});
-      const [sel,setSel]=useState(null);
-      const [fb,setFb]=useState(null);
-      const q = qs[idx];
-
-      const pick = optId => {
-        if (fb) return;
-        const ok = q.opts.find(o=>o.id===optId)?.isCorrect||false;
-        setSel(optId); setFb(ok?'ok':'no');
-        const nr = {...results,[q.letter.id]:ok}; setResults(nr);
-        setTimeout(()=>{
-          if (idx+1>=qs.length) onDone(nr);
-          else { setIdx(i=>i+1); setSel(null); setFb(null); }
-        }, 700);
-      };
-
-      return (
-        <div style={{minHeight:'100vh',background:C.bg,padding:'18px',fontFamily:PX,display:'flex',flexDirection:'column'}}>
-          <div style={{marginBottom:'14px'}}>
-            <div style={{color:C.gold,fontSize:'9px',marginBottom:'6px'}}>📋 PLACEMENT TEST</div>
-            <div style={{color:C.dim,fontSize:'6px',marginBottom:'6px'}}>Letter {idx+1} of {qs.length} — all 28 letters</div>
-            <PBar value={idx} max={qs.length} color={C.gold} h={7}/>
-          </div>
-          <div className="slide-up" style={{...pn({flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',marginBottom:'16px',minHeight:'180px'})}}>
-            <div style={{color:C.dim,fontSize:'7px',marginBottom:'14px',textAlign:'center'}}>
-              Which letter is this? <span style={{color:'#445'}}>({q.form} form)</span>
-            </div>
-            <div style={{fontSize:'86px',fontFamily:AR,color:'white',lineHeight:1,textAlign:'center',
-              filter:fb==='ok'?'drop-shadow(0 0 14px #4de8e8)':'none',transition:'filter .3s'}}>
-              {q.letter[q.form]}
-            </div>
-            <div style={{color:'#2a3a2a',fontSize:'7px',marginTop:'12px'}}>Tap the correct name</div>
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
-            {q.opts.map(opt=>{
-              let bg=C.opt;
-              if(fb){if(opt.isCorrect)bg=C.correct;else if(opt.id===sel)bg=C.wrong;}
-              return (
-                <button key={opt.id} onClick={()=>pick(opt.id)} style={bt(bg,{padding:'14px 8px',lineHeight:1.8})}>
-                  <div style={{fontSize:'8px'}}>{opt.display}</div>
-                  <div style={{fontSize:'6px',color:'rgba(255,255,255,0.4)',marginTop:'2px'}}>({opt.sub})</div>
-                </button>
-              );
-            })}
-          </div>
-          <div style={{marginTop:'14px',color:'#1a2a1a',fontSize:'6px',textAlign:'center'}}>
-            This personalizes your learning journey
-          </div>
+        <div style={{background:'rgba(30,80,30,0.3)',border:`1px solid #2d5a28`,padding:'8px 12px',width:'100%',textAlign:'center'}}>
+          <div style={{color:'#aaffaa',fontSize:'6px',lineHeight:1.8}}>📝 {letter.word}</div>
         </div>
-      );
-    }
+      </div>
+      <div style={{display:'flex',gap:'10px'}}>
+        {idx>0&&<button style={bt(C.stone,{flex:0.4,fontSize:'7px'})} onClick={()=>setIdx(i=>i-1)}>← BACK</button>}
+        <button style={bt(isLast?C.grass:C.stone,{flex:1,fontSize:'8px'})} onClick={()=>isLast?onDone():setIdx(i=>i+1)}>
+          {isLast?'⚔️ START LESSON!':`NEXT → (${idx+2}/${sessionItems.length})`}
+        </button>
+      </div>
+    </div>
+  );
+}
 
-    // ── WORLD MAP ────────────────────────────────────────────────
-    function WorldMap({player, stats, onZone}) {
-      const mat = getMat(player.xp);
-      const zones = [
-        {id:'village',name:'THE VILLAGE',  ar:'القرية',       emoji:'🏡',bg:C.grass,  locked:false,           note:`${player.mastered.length}/28 letters mastered`},
-        {id:'mine',   name:'THE MINE',     ar:'المنجم',       emoji:'⛏️',bg:C.stone, locked:player.mastered.length<10, note:player.mastered.length<10?`Need 10 letters (${player.mastered.length}/10)`:'Unlocked!'},
-        {id:'nether', name:'THE NETHER',   ar:'العالم الآخر', emoji:'🔥',bg:C.nether, locked:player.mastered.length<28, note:'Master all 28 letters first'},
-      ];
-
-      // Find weakest 3 letters for hint display
-      const weak = LETTERS.filter(l=>stats[l.id]&&stats[l.id].total>0)
-        .sort((a,b)=>{
-          const sa=stats[a.id], sb=stats[b.id];
-          return (sb.wrong/sb.total)-(sa.wrong/sa.total);
-        }).slice(0,3);
-
-      return (
-        <div style={{minHeight:'100vh',background:C.bg,padding:'18px',fontFamily:PX}}>
-          <div style={{...pn({marginBottom:'14px'})}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <div>
-                <div style={{color:mat.color,fontSize:'8px'}}>{mat.emoji} {mat.name}</div>
-                <div style={{color:C.dim,fontSize:'6px',marginTop:'2px'}}>{player.xp} XP</div>
-              </div>
-              <div style={{textAlign:'center'}}>
-                <div style={{color:'#FF8C00',fontSize:'9px'}}>🔥 {player.streak}</div>
-                <div style={{color:C.dim,fontSize:'6px'}}>day streak</div>
-              </div>
-              <div style={{textAlign:'right'}}>
-                <div style={{color:C.emerald,fontSize:'8px',marginBottom:'2px'}}>💎 {player.emeralds}</div>
-                <Hearts cur={player.hearts} max={5}/>
-              </div>
-            </div>
-          </div>
-
-          <div style={{color:C.gold,fontSize:'10px',marginBottom:'4px'}}>🗺️ WORLD MAP</div>
-          <div style={{color:C.dim,fontSize:'6px',marginBottom:'14px'}}>Choose your zone, adventurer</div>
-
-          <div style={{...pn({marginBottom:'14px',borderColor:player.dailyDone?'#2d6b28':'#cc7700',borderTopColor:player.dailyDone?C.grassL:'#ffaa00'})}}>
-            {player.dailyDone
-              ? <div style={{color:C.grassL,fontSize:'7px'}}>✅ DAILY MISSION COMPLETE! See you tomorrow.</div>
-              : <>
-                  <div style={{color:'#FF8C00',fontSize:'7px',marginBottom:'4px'}}>📜 DAILY MISSION ACTIVE</div>
-                  <div style={{color:C.dim,fontSize:'6px'}}>Survive 15 minutes in Arabic World today!</div>
-                </>}
-          </div>
-
-          <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'16px'}}>
-            {zones.map(z=>(
-              <button key={z.id} onClick={()=>!z.locked&&onZone(z.id)}
-                style={bt(z.locked?'#1a1a2a':z.bg,{padding:'14px',display:'flex',alignItems:'center',gap:'12px',opacity:z.locked?.45:1,cursor:z.locked?'not-allowed':'pointer',textAlign:'left'})}>
-                <span style={{fontSize:'26px',flexShrink:0}}>{z.locked?'🔒':z.emoji}</span>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:'8px'}}>{z.name}</div>
-                  <div style={{fontFamily:AR,fontSize:'13px',color:'rgba(255,255,255,0.5)',marginTop:'2px'}}>{z.ar}</div>
-                  <div style={{fontSize:'6px',color:'rgba(255,255,255,0.35)',marginTop:'2px'}}>{z.note}</div>
-                </div>
-                {!z.locked&&<span>▶</span>}
-              </button>
-            ))}
-          </div>
-
-          {weak.length>0 && (
-            <div style={{...pn({marginBottom:'14px',borderColor:'#cc4400',borderTopColor:'#ff6622'})}}>
-              <div style={{color:'#ff6622',fontSize:'7px',marginBottom:'8px'}}>⚠️ NEEDS PRACTICE</div>
-              <div style={{display:'flex',gap:'8px'}}>
-                {weak.map(l=>(
-                  <div key={l.id} style={{flex:1,background:'rgba(0,0,0,0.4)',border:'1px solid #333',padding:'8px',textAlign:'center'}}>
-                    <div style={{fontFamily:AR,fontSize:'28px',color:'white',lineHeight:1,marginBottom:'4px'}}>{l.ar}</div>
-                    <div style={{fontSize:'6px',color:C.dim}}>{l.name}</div>
-                    <div style={{fontSize:'5px',color:'#ff6622',marginTop:'2px'}}>
-                      {Math.round((stats[l.id].wrong/stats[l.id].total)*100)}% errors
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div style={pn()}>
-            <div style={{color:C.dim,fontSize:'6px',marginBottom:'8px'}}>LETTERS MASTERED</div>
-            <div style={{display:'flex',flexWrap:'wrap',gap:'3px',marginBottom:'8px'}}>
-              {LETTERS.map(l=>{
-                const s = stats[l.id];
-                const errorRate = s&&s.total>0 ? s.wrong/s.total : 0;
-                const isMastered = player.mastered.includes(l.id);
-                const bg = isMastered ? '#2d5a28' : errorRate>0.5 ? '#3a1111' : '#111';
-                const border = isMastered ? C.grassL : errorRate>0.5 ? '#aa2222' : '#333';
-                return (
-                  <div key={l.id} title={l.name}
-                    style={{width:'21px',height:'21px',fontFamily:AR,fontSize:'12px',background:bg,border:`1px solid ${border}`,display:'flex',alignItems:'center',justifyContent:'center',transition:'background .4s'}}>
-                    {l.ar}
-                  </div>
-                );
-              })}
-            </div>
-            <PBar value={player.mastered.length} max={28} color={C.diamond} h={6}/>
-            <div style={{color:C.dim,fontSize:'6px',marginTop:'4px'}}>
-              🟩 mastered &nbsp;🟥 needs work &nbsp;⬛ not seen
-            </div>
-          </div>
+// ── WORD INTRO CARDS ──────────────────────────────────────────────
+function WordIntro({sessionItems, mastered, onDone}) {
+  const [idx,setIdx]=useState(0);
+  const word=sessionItems[idx];
+  const isLast=idx===sessionItems.length-1;
+  return (
+    <div style={{minHeight:'100vh',background:'linear-gradient(180deg,#0e0a00,#1a1200)',padding:'18px',fontFamily:PX,display:'flex',flexDirection:'column'}}>
+      <div style={{marginBottom:'14px'}}>
+        <div style={{color:C.mineL,fontSize:'8px',marginBottom:'6px'}}>⛏️ MINE — LEARN THE WORDS</div>
+        <div style={{color:C.dim,fontSize:'6px',marginBottom:'6px'}}>Word {idx+1} of {sessionItems.length}</div>
+        <PBar value={idx} max={sessionItems.length} color={C.mineL} h={6}/>
+      </div>
+      <div className="slide-up" key={word.id} style={{...pn({flex:1,display:'flex',flexDirection:'column',alignItems:'center',marginBottom:'14px',padding:'20px 14px'})}}>
+        {/* Theme badge */}
+        <div style={{background:word.theme==='minecraft'?'rgba(50,30,0,0.8)':'rgba(0,30,50,0.8)',border:`1px solid ${word.theme==='minecraft'?C.mine:'#226'}`,padding:'3px 10px',marginBottom:'14px',fontSize:'6px',color:word.theme==='minecraft'?C.mineL:'#99ccff'}}>
+          {word.theme==='minecraft'?'⛏ MINECRAFT':'📚 ARABIC WORLD'}
         </div>
-      );
-    }
+        {/* Emoji + Arabic */}
+        <div style={{fontSize:'42px',marginBottom:'8px'}}>{word.emoji}</div>
+        <div className="pop" style={{fontSize:'64px',fontFamily:AR,color:'white',lineHeight:1,textAlign:'center',textShadow:`0 0 24px ${C.mineL}66`,marginBottom:'8px'}}>{word.ar}</div>
+        <div style={{color:C.gold,fontSize:'14px',marginBottom:'2px'}}>{word.en}</div>
+        <div style={{color:C.dim,fontSize:'7px',marginBottom:'18px'}}>/{word.t}/</div>
+        {/* Letter breakdown */}
+        <div style={{color:C.dim,fontSize:'6px',marginBottom:'8px',alignSelf:'flex-start'}}>LETTERS IN THIS WORD</div>
+        <div style={{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'14px',justifyContent:'center'}}>
+          {word.letters.map(lid=>{
+            const l=LETTERS.find(x=>x.id===lid);
+            const known=mastered.includes(lid);
+            return(
+              <div key={lid} style={{background:known?'rgba(30,80,30,0.5)':'rgba(80,30,30,0.5)',border:`1px solid ${known?C.grassL:'#aa2222'}`,padding:'6px 10px',textAlign:'center',minWidth:'44px'}}>
+                <div style={{fontFamily:AR,fontSize:'22px',color:'white',lineHeight:1}}>{l.isolated}</div>
+                <div style={{fontSize:'5px',color:known?C.grassL:'#ff6666',marginTop:'2px'}}>{l.name}</div>
+                {known&&<div style={{fontSize:'5px',color:C.grassL}}>✓ known</div>}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{background:'rgba(30,80,30,0.3)',border:`1px solid #2d5a28`,padding:'8px 12px',width:'100%',textAlign:'center'}}>
+          <div style={{color:'#aaffaa',fontSize:'6px',lineHeight:1.8}}>💡 All letters in this word are ones you've studied in The Village!</div>
+        </div>
+      </div>
+      <div style={{display:'flex',gap:'10px'}}>
+        {idx>0&&<button style={bt(C.stone,{flex:0.4,fontSize:'7px'})} onClick={()=>setIdx(i=>i-1)}>← BACK</button>}
+        <button style={bt(isLast?C.mine:C.stone,{flex:1,fontSize:'8px'})} onClick={()=>isLast?onDone():setIdx(i=>i+1)}>
+          {isLast?'⛏️ ENTER THE MINE!':`NEXT → (${idx+2}/${sessionItems.length})`}
+        </button>
+      </div>
+    </div>
+  );
+}
 
-    // ── LETTER INTRO CARDS ───────────────────────────────────────
-    function LetterIntro({sessionLetters, onDone}) {
-      const [idx, setIdx] = useState(0);
-      const letter = sessionLetters[idx];
-      const isLast = idx === sessionLetters.length - 1;
+// ── GENERIC LESSON (letters + words share this) ───────────────────
+function Lesson({player, exercises, zone, onDone, onBack}) {
+  const [idx,setIdx]=useState(0);
+  const [hearts,setHearts]=useState(player.hearts);
+  const [xp,setXp]=useState(0);
+  const [em,setEm]=useState(0);
+  const [correct,setCorrect]=useState(0);
+  const [sel,setSel]=useState(null);
+  const [fb,setFb]=useState(null);
+  const [secs,setSecs]=useState(0);
+  const [done,setDone]=useState(false);
+  const [learnedIds,setLearnedIds]=useState([]);
+  const [bonus,setBonus]=useState(false);
+  const [statsDelta,setStatsDelta]=useState({});
 
-      return (
-        <div style={{minHeight:'100vh',background:'linear-gradient(180deg,#050e1a,#091a12)',padding:'18px',fontFamily:PX,display:'flex',flexDirection:'column'}}>
-          <div style={{marginBottom:'14px'}}>
-            <div style={{color:C.diamond,fontSize:'8px',marginBottom:'6px'}}>📖 LEARN BEFORE YOU QUEST</div>
-            <div style={{color:C.dim,fontSize:'6px',marginBottom:'6px'}}>
-              Letter {idx+1} of {sessionLetters.length} in today's session
-            </div>
-            <PBar value={idx} max={sessionLetters.length} color={C.diamond} h={6}/>
-          </div>
+  useEffect(()=>{if(done)return;const t=setInterval(()=>setSecs(s=>s+1),1000);return()=>clearInterval(t);},[done]);
+  const ex=exercises[idx];
+  const fmt=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+  const itemId = ex ? (ex.letterId!==undefined ? ex.letterId : ex.wordId) : null;
 
-          <div className="slide-up" key={letter.id} style={{...pn({flex:1,display:'flex',flexDirection:'column',alignItems:'center',marginBottom:'14px',padding:'20px 14px'})}}>
-            {/* Big letter display */}
-            <div className="pop" style={{fontSize:'88px',fontFamily:AR,color:'white',lineHeight:1,textAlign:'center',
-              textShadow:`0 0 30px ${C.diamond}55`,marginBottom:'8px'}}>
-              {letter.isolated}
-            </div>
-            <div style={{color:C.gold,fontSize:'13px',marginBottom:'2px'}}>{letter.name}</div>
-            <div style={{color:C.dim,fontSize:'7px',marginBottom:'16px'}}>/{letter.t}/</div>
+  const pick=optId=>{
+    if(fb||done)return;
+    const ok=ex.opts.find(o=>o.id===optId)?.isCorrect||false;
+    setSel(optId);setFb(ok?'ok':'no');
+    setStatsDelta(prev=>{const cur=prev[itemId]||{correct:0,wrong:0};return {...prev,[itemId]:{correct:cur.correct+(ok?1:0),wrong:cur.wrong+(ok?0:1)}};});
+    let nh=hearts,nc=correct,nx=xp,ne=em;
+    if(ok){nc++;nx+=10;setLearnedIds(p=>[...new Set([...p,itemId])]);if(nc%5===0){ne+=2;setBonus(true);setTimeout(()=>setBonus(false),1100);}}
+    else{nh=Math.max(0,hearts-1);}
+    setHearts(nh);setCorrect(nc);setXp(nx);setEm(ne);
+    const over=nh===0||(idx+1)>=exercises.length;
+    setTimeout(()=>{if(over)setDone(true);else{setIdx(i=>i+1);setSel(null);setFb(null);}},900);
+  };
 
-            {/* Pronunciation hint */}
-            <div style={{background:'rgba(0,50,100,0.3)',border:`1px solid ${C.bD}`,padding:'8px 12px',marginBottom:'16px',width:'100%',textAlign:'center'}}>
-              <div style={{color:'#99ccff',fontSize:'6px',lineHeight:1.8}}>{letter.hint}</div>
-            </div>
+  if(done) return <Complete xp={xp} em={em} correct={correct} total={idx+1} secs={secs} hearts={hearts} statsDelta={statsDelta} zone={zone} onContinue={()=>onDone({xp,em,learnedIds,secs,statsDelta})}/>;
+  if(!ex)return null;
 
-            {/* All 4 forms */}
-            <div style={{color:C.dim,fontSize:'6px',marginBottom:'10px',alignSelf:'flex-start'}}>ALL 4 FORMS</div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',width:'100%',marginBottom:'14px'}}>
-              {FORM_NAMES.map(form=>(
-                <div key={form} style={{background:'rgba(0,0,0,0.5)',border:`1px solid ${C.bD}`,padding:'10px',textAlign:'center'}}>
-                  <div style={{fontFamily:AR,fontSize:'30px',color:'white',lineHeight:1,marginBottom:'4px'}}>{letter[form]}</div>
-                  <div style={{fontSize:'6px',color:C.dim}}>{form}</div>
-                </div>
-              ))}
-            </div>
+  const zoneColor = zone==='mine'?C.mineL:C.grassL;
+  const zoneBg    = zone==='mine'?'linear-gradient(180deg,#1a1000,#0e0800)':'linear-gradient(180deg,#0c1f0c,#080f08)';
 
-            {/* Example word */}
-            <div style={{background:'rgba(30,80,30,0.3)',border:`1px solid #2d5a28`,padding:'8px 12px',width:'100%',textAlign:'center'}}>
-              <div style={{color:'#aaffaa',fontSize:'6px',lineHeight:1.8}}>📝 {letter.word}</div>
-            </div>
-          </div>
-
-          <div style={{display:'flex',gap:'10px'}}>
-            {idx>0 && (
-              <button style={bt(C.stone,{flex:0.4,fontSize:'7px'})} onClick={()=>setIdx(i=>i-1)}>← BACK</button>
-            )}
-            <button style={bt(isLast?C.grass:C.stone,{flex:1,fontSize:'8px'})} onClick={()=>isLast?onDone():setIdx(i=>i+1)}>
-              {isLast ? '⚔️ START LESSON!' : `NEXT → (${idx+2}/${sessionLetters.length})`}
+  return (
+    <div style={{minHeight:'100vh',background:zoneBg,padding:'14px',fontFamily:PX,display:'flex',flexDirection:'column',position:'relative'}}>
+      {bonus&&<div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',background:'rgba(0,0,0,0.95)',border:`3px solid ${C.emerald}`,padding:'16px 24px',zIndex:100,textAlign:'center',fontSize:'10px',color:C.emerald}}>💎 +2 EMERALDS!</div>}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}}>
+        <button onClick={onBack} style={{background:'none',border:'none',color:'#444',fontSize:'22px',cursor:'pointer',padding:'0 4px'}}>←</button>
+        <Hearts cur={hearts} max={5}/>
+        <div style={{color:C.gold,fontSize:'7px'}}>+{xp} XP</div>
+      </div>
+      <div style={{marginBottom:'10px'}}>
+        <div style={{display:'flex',justifyContent:'space-between',marginBottom:'4px'}}>
+          <span style={{color:C.dim,fontSize:'6px'}}>{idx+1}/{exercises.length} questions</span>
+          <span style={{color:secs>=900?zoneColor:C.dim,fontSize:'6px'}}>⏱ {fmt(secs)} {secs>=900?'✅':'/ 15:00'}</span>
+        </div>
+        <PBar value={idx} max={exercises.length} h={6} color={zoneColor}/>
+        <div style={{marginTop:'3px'}}><PBar value={Math.min(secs,900)} max={900} color='#FF8C00' h={4}/></div>
+      </div>
+      <div style={{...pn({flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',marginBottom:'14px',minHeight:'200px'})}}>
+        <div style={{color:C.dim,fontSize:'7px',marginBottom:'12px',textAlign:'center'}}>{ex.qText}</div>
+        {ex.qAr&&<div style={{fontSize:'72px',fontFamily:AR,color:'white',lineHeight:1,textAlign:'center',filter:`drop-shadow(0 0 ${fb==='ok'?'18px #4a7c3f':fb==='no'?'18px #7a1111':'0px transparent'})`,transition:'filter .3s'}}>{ex.qAr}</div>}
+        {ex.qBig&&<div style={{fontSize:'14px',color:C.gold,marginBottom:'8px',textAlign:'center'}}>{ex.qBig}</div>}
+        {ex.qSub&&<div style={{color:'#445',fontSize:'6px',marginTop:'8px',textAlign:'center'}}>{ex.qSub}</div>}
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+        {ex.opts.map(opt=>{
+          let bg=C.opt;if(fb){if(opt.isCorrect)bg=C.correct;else if(opt.id===sel)bg=C.wrong;}
+          return(
+            <button key={String(opt.id)} onClick={()=>pick(opt.id)} style={bt(bg,{padding:'12px 8px',display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',transition:'background .2s'})}>
+              {opt.isArabic?<span style={{fontFamily:AR,fontSize:'32px',lineHeight:1}}>{opt.display}</span>:<span style={{fontSize:'7px'}}>{opt.display}</span>}
+              {opt.sub&&<span style={{fontSize:'5px',color:'rgba(255,255,255,0.35)'}}>{opt.sub}</span>}
             </button>
+          );
+        })}
+      </div>
+      {fb&&<div style={{marginTop:'8px',padding:'8px',background:fb==='ok'?'rgba(45,107,40,.5)':'rgba(122,17,17,.5)',border:`2px solid ${fb==='ok'?C.grassL:'#aa2222'}`,color:'white',fontSize:'7px',textAlign:'center'}}>
+        {fb==='ok'?`✅ Correct! +10 XP`:`❌ Answer: ${ex.opts.find(o=>o.isCorrect)?.display||''}`}
+      </div>}
+    </div>
+  );
+}
+
+// ── COMPLETE ──────────────────────────────────────────────────────
+function Complete({xp,em,correct,total,secs,hearts,statsDelta,zone,onContinue}) {
+  const acc=total>0?Math.round((correct/total)*100):0;
+  const fmt=s=>`${Math.floor(s/60)}m ${String(s%60).padStart(2,'0')}s`;
+  const items = zone==='mine'
+    ? Object.keys(statsDelta).map(id=>WORDS.find(w=>w.id===Number(id))).filter(Boolean)
+    : Object.keys(statsDelta).map(id=>LETTERS.find(l=>l.id===Number(id))).filter(Boolean);
+  return (
+    <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#060618,#12062a)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'20px',fontFamily:PX}}>
+      <div className="pop" style={{fontSize:'52px',marginBottom:'12px'}}>{acc>=80?'🏆':acc>=50?'⭐':'💪'}</div>
+      <div style={{color:C.gold,fontSize:'13px',textShadow:'2px 2px 0 #000',marginBottom:'6px',textAlign:'center'}}>QUEST COMPLETE!</div>
+      <div style={{color:C.dim,fontSize:'7px',marginBottom:'4px',textAlign:'center'}}>{zone==='mine'?'⛏️ THE MINE':'🏡 THE VILLAGE'}</div>
+      {secs>=900?<div style={{color:C.grassL,fontSize:'7px',marginBottom:'20px',textAlign:'center'}}>🔥 15-MINUTE DAILY MISSION DONE!</div>
+        :<div style={{color:C.dim,fontSize:'7px',marginBottom:'20px',textAlign:'center'}}>Aim for 15 min next session!</div>}
+      <div style={{...pn({width:'100%',maxWidth:'320px',marginBottom:'14px'})}}>
+        {[['⭐ XP EARNED',`+${xp}`,C.xp],['💎 EMERALDS',`+${em}`,C.emerald],['🎯 ACCURACY',`${acc}%`,acc>=80?C.grassL:C.gold],
+          ['✅ CORRECT',`${correct}/${total}`,C.diamond],['⏱ TIME',fmt(secs),C.dim],['❤️ HEARTS',`${hearts}/5`,C.heart]]
+          .map(([label,val,col])=>(
+          <div key={label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'9px'}}>
+            <span style={{color:C.dim,fontSize:'6px'}}>{label}</span>
+            <span style={{color:col,fontSize:'8px'}}>{val}</span>
           </div>
-
-          <div style={{marginTop:'10px',color:'#1a2a1a',fontSize:'6px',textAlign:'center'}}>
-            Study each letter — you'll be tested on these shortly
-          </div>
-        </div>
-      );
-    }
-
-    // ── LESSON ───────────────────────────────────────────────────
-    function Lesson({player, stats, exercises, onDone, onBack}) {
-      const [idx,setIdx]=useState(0);
-      const [hearts,setHearts]=useState(player.hearts);
-      const [xp,setXp]=useState(0);
-      const [em,setEm]=useState(0);
-      const [correct,setCorrect]=useState(0);
-      const [sel,setSel]=useState(null);
-      const [fb,setFb]=useState(null);
-      const [secs,setSecs]=useState(0);
-      const [done,setDone]=useState(false);
-      const [learned,setLearned]=useState([]);
-      const [bonus,setBonus]=useState(false);
-      const [statsDelta,setStatsDelta]=useState({});
-
-      useEffect(()=>{
-        if(done) return;
-        const t = setInterval(()=>setSecs(s=>s+1),1000);
-        return ()=>clearInterval(t);
-      },[done]);
-
-      const ex = exercises[idx];
-      const fmt = s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
-
-      const pick = optId => {
-        if(fb||done) return;
-        const ok = ex.opts.find(o=>o.id===optId)?.isCorrect||false;
-        setSel(optId); setFb(ok?'ok':'no');
-
-        // Update stats delta for this letter
-        setStatsDelta(prev=>{
-          const cur = prev[ex.letterId] || {correct:0,wrong:0};
-          return {...prev,[ex.letterId]:{correct:cur.correct+(ok?1:0),wrong:cur.wrong+(ok?0:1)}};
-        });
-
-        let nh=hearts, nc=correct, nx=xp, ne=em;
-        if(ok){
-          nc++; nx+=10;
-          setLearned(p=>[...new Set([...p,ex.letterId])]);
-          if(nc%5===0){ ne+=2; setBonus(true); setTimeout(()=>setBonus(false),1100); }
-        } else {
-          nh = Math.max(0,hearts-1);
-        }
-        setHearts(nh); setCorrect(nc); setXp(nx); setEm(ne);
-        const over = nh===0||(idx+1)>=exercises.length;
-        setTimeout(()=>{
-          if(over) setDone(true);
-          else { setIdx(i=>i+1); setSel(null); setFb(null); }
-        },900);
-      };
-
-      if(done) return (
-        <Complete xp={xp} em={em} correct={correct} total={idx+1}
-          secs={secs} hearts={hearts} statsDelta={statsDelta}
-          onContinue={()=>onDone({xp,em,learned,secs,statsDelta})}/>
-      );
-      if(!ex) return null;
-
-      return (
-        <div style={{minHeight:'100vh',background:'linear-gradient(180deg,#0c1f0c,#080f08)',padding:'14px',fontFamily:PX,display:'flex',flexDirection:'column',position:'relative'}}>
-          {bonus&&(
-            <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',
-              background:'rgba(0,0,0,0.95)',border:`3px solid ${C.emerald}`,padding:'16px 24px',
-              zIndex:100,textAlign:'center',fontSize:'10px',color:C.emerald}}>
-              💎 +2 EMERALDS!
-            </div>
-          )}
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}}>
-            <button onClick={onBack} style={{background:'none',border:'none',color:'#444',fontSize:'22px',cursor:'pointer',padding:'0 4px'}}>←</button>
-            <Hearts cur={hearts} max={5}/>
-            <div style={{color:C.gold,fontSize:'7px'}}>+{xp} XP</div>
-          </div>
-          <div style={{marginBottom:'10px'}}>
-            <div style={{display:'flex',justifyContent:'space-between',marginBottom:'4px'}}>
-              <span style={{color:C.dim,fontSize:'6px'}}>{idx+1}/{exercises.length} questions</span>
-              <span style={{color:secs>=900?C.grassL:C.dim,fontSize:'6px'}}>⏱ {fmt(secs)} {secs>=900?'✅':'/ 15:00'}</span>
-            </div>
-            <PBar value={idx} max={exercises.length} h={6}/>
-            <div style={{marginTop:'3px'}}><PBar value={Math.min(secs,900)} max={900} color='#FF8C00' h={4}/></div>
-          </div>
-          <div style={{...pn({flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',marginBottom:'14px',minHeight:'200px'})}}>
-            <div style={{color:C.dim,fontSize:'7px',marginBottom:'12px',textAlign:'center'}}>{ex.qText}</div>
-            {ex.qAr&&(
-              <div style={{fontSize:'82px',fontFamily:AR,color:'white',lineHeight:1,textAlign:'center',
-                filter:`drop-shadow(0 0 ${fb==='ok'?'18px #4a7c3f':fb==='no'?'18px #7a1111':'0px transparent'})`,transition:'filter .3s'}}>
-                {ex.qAr}
-              </div>
-            )}
-            {ex.qBig&&<div style={{fontSize:'13px',color:C.gold,marginBottom:'8px',textAlign:'center'}}>{ex.qBig}</div>}
-            {ex.qSub&&<div style={{color:'#445',fontSize:'6px',marginTop:'8px',textAlign:'center'}}>{ex.qSub}</div>}
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
-            {ex.opts.map(opt=>{
-              let bg=C.opt;
-              if(fb){if(opt.isCorrect)bg=C.correct;else if(opt.id===sel)bg=C.wrong;}
-              return (
-                <button key={String(opt.id)} onClick={()=>pick(opt.id)}
-                  style={bt(bg,{padding:'12px 8px',display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',transition:'background .2s'})}>
-                  {opt.isArabic
-                    ? <span style={{fontFamily:AR,fontSize:'34px',lineHeight:1}}>{opt.display}</span>
-                    : <span style={{fontSize:'7px'}}>{opt.display}</span>}
-                  {opt.sub&&<span style={{fontSize:'5px',color:'rgba(255,255,255,0.35)'}}>{opt.sub}</span>}
-                </button>
-              );
-            })}
-          </div>
-          {fb&&(
-            <div style={{marginTop:'8px',padding:'8px',
-              background:fb==='ok'?'rgba(45,107,40,.5)':'rgba(122,17,17,.5)',
-              border:`2px solid ${fb==='ok'?C.grassL:'#aa2222'}`,color:'white',fontSize:'7px',textAlign:'center'}}>
-              {fb==='ok'?'✅ Correct! +10 XP':`❌ Answer: ${ex.opts.find(o=>o.isCorrect)?.display||''}`}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    // ── COMPLETE ─────────────────────────────────────────────────
-    function Complete({xp,em,correct,total,secs,hearts,statsDelta,onContinue}) {
-      const acc = total>0?Math.round((correct/total)*100):0;
-      const fmt = s=>`${Math.floor(s/60)}m ${String(s%60).padStart(2,'0')}s`;
-      // Show letters that improved this session
-      const improved = Object.entries(statsDelta)
-        .filter(([,s])=>s.correct>0)
-        .map(([id])=>LETTERS.find(l=>l.id===Number(id)))
-        .filter(Boolean).slice(0,6);
-      return (
-        <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#060618,#12062a)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'20px',fontFamily:PX}}>
-          <div className="pop" style={{fontSize:'52px',marginBottom:'12px'}}>{acc>=80?'🏆':acc>=50?'⭐':'💪'}</div>
-          <div style={{color:C.gold,fontSize:'13px',textShadow:'2px 2px 0 #000',marginBottom:'6px',textAlign:'center'}}>
-            QUEST COMPLETE!
-          </div>
-          {secs>=900
-            ?<div style={{color:C.grassL,fontSize:'7px',marginBottom:'20px',textAlign:'center'}}>🔥 15-MINUTE DAILY MISSION DONE!</div>
-            :<div style={{color:C.dim,fontSize:'7px',marginBottom:'20px',textAlign:'center'}}>Aim for 15 min next session!</div>}
-          <div style={{...pn({width:'100%',maxWidth:'320px',marginBottom:'14px'})}}>
-            {[['⭐ XP EARNED',`+${xp}`,C.xp],['💎 EMERALDS',`+${em}`,C.emerald],
-              ['🎯 ACCURACY',`${acc}%`,acc>=80?C.grassL:C.gold],['✅ CORRECT',`${correct}/${total}`,C.diamond],
-              ['⏱ TIME',fmt(secs),C.dim],['❤️ HEARTS',`${hearts}/5`,C.heart]]
-              .map(([label,val,col])=>(
-              <div key={label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'9px'}}>
-                <span style={{color:C.dim,fontSize:'6px'}}>{label}</span>
-                <span style={{color:col,fontSize:'8px'}}>{val}</span>
+        ))}
+      </div>
+      {items.length>0&&(
+        <div style={{...pn({width:'100%',maxWidth:'320px',marginBottom:'14px'})}}>
+          <div style={{color:C.diamond,fontSize:'6px',marginBottom:'8px'}}>✨ PRACTICED THIS SESSION</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
+            {items.map(item=>(
+              <div key={item.id} style={{background:'rgba(0,0,0,0.4)',border:`1px solid ${C.bD}`,padding:'4px 8px',textAlign:'center'}}>
+                <span style={{fontFamily:AR,fontSize:'20px',color:'white'}}>{item.ar}</span>
+                <div style={{fontSize:'5px',color:C.dim,marginTop:'2px'}}>{item.en||item.name}</div>
               </div>
             ))}
           </div>
-          {improved.length>0&&(
-            <div style={{...pn({width:'100%',maxWidth:'320px',marginBottom:'14px'})}}>
-              <div style={{color:C.diamond,fontSize:'6px',marginBottom:'8px'}}>✨ PRACTICED THIS SESSION</div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:'6px'}}>
-                {improved.map(l=>(
-                  <div key={l.id} style={{background:'rgba(0,0,0,0.4)',border:`1px solid ${C.bD}`,padding:'4px 8px',textAlign:'center'}}>
-                    <span style={{fontFamily:AR,fontSize:'20px',color:'white'}}>{l.ar}</span>
-                    <div style={{fontSize:'5px',color:C.dim,marginTop:'2px'}}>{l.name}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          <button style={bt(C.grass,{maxWidth:'320px',fontSize:'8px'})} onClick={onContinue}>🗺️ BACK TO MAP</button>
-          <div style={{marginTop:'10px',color:'#1a2a1a',fontSize:'6px',textAlign:'center'}}>
-            💾 Progress saved! Return tomorrow for your streak 🔥
-          </div>
         </div>
-      );
+      )}
+      <button style={bt(C.grass,{maxWidth:'320px',fontSize:'8px'})} onClick={onContinue}>🗺️ BACK TO MAP</button>
+      <div style={{marginTop:'10px',color:'#1a2a1a',fontSize:'6px',textAlign:'center'}}>💾 Progress saved! Return tomorrow for your streak 🔥</div>
+    </div>
+  );
+}
+
+// ── APP ───────────────────────────────────────────────────────────
+function App() {
+  const saved = loadSave();
+  const [player,     setPlayer]     = useState(saved.player);
+  const [letterStats,setLetterStats]= useState(saved.letterStats);
+  const [wordStats,  setWordStats]  = useState(saved.wordStats);
+  const [screen,     setScreen]     = useState('home');
+  const [sessionItems,setSessionItems]=useState([]);
+  const [exercises,  setExercises]  = useState([]);
+  const [activeZone, setActiveZone] = useState('village');
+
+  useEffect(()=>{ writeSave(player,letterStats,wordStats); },[player,letterStats,wordStats]);
+
+  // Daily reset
+  useEffect(()=>{
+    const today=new Date().toDateString();
+    if(player.lastPlayDate&&player.lastPlayDate!==today){
+      const yesterday=new Date(Date.now()-86400000).toDateString();
+      setPlayer(p=>({...p,dailyDone:false,streak:p.lastPlayDate===yesterday?p.streak:0,lastPlayDate:today}));
     }
+  },[]);
 
-    // ── APP ──────────────────────────────────────────────────────
-    function App() {
-      const [player, setPlayer] = useState(()=>loadSave().player);
-      const [stats,  setStats ] = useState(()=>loadSave().stats);
-      const [screen, setScreen] = useState('home');
-      const [sessionLetters, setSessionLetters] = useState([]);
-      const [exercises,      setExercises]      = useState([]);
+  const handlePlacement = results => {
+    const known=Object.entries(results).filter(([,v])=>v).map(([k])=>Number(k));
+    const newStats={};
+    Object.entries(results).forEach(([id,ok])=>{newStats[Number(id)]={total:1,correct:ok?1:0,wrong:ok?0:1,lastSeen:Date.now()};});
+    setPlayer(p=>({...p,mastered:known,xp:known.length*8,emeralds:Math.floor(known.length/4),placementDone:true}));
+    setLetterStats(newStats);
+    setScreen('map');
+  };
 
-      // Persist on every change
-      useEffect(()=>{ writeSave(player,stats); },[player,stats]);
+  const startVillage = () => {
+    const {exercises:exs,sessionItems:si}=buildLetterSession(player.mastered,letterStats);
+    setExercises(exs); setSessionItems(si); setActiveZone('village');
+    setScreen('letter-intro');
+  };
 
-      // Daily streak reset check
-      useEffect(()=>{
-        const today = new Date().toDateString();
-        if (player.lastPlayDate && player.lastPlayDate !== today) {
-          const yesterday = new Date(Date.now()-86400000).toDateString();
-          if (player.lastPlayDate !== yesterday) {
-            // Missed a day — reset streak
-            setPlayer(p=>({...p, streak:0, dailyDone:false, lastPlayDate:today}));
-          } else {
-            setPlayer(p=>({...p, dailyDone:false, lastPlayDate:today}));
-          }
-        }
-      },[]);
+  const startMine = () => {
+    const {exercises:exs,sessionItems:si}=buildWordSession(player.mastered,wordStats);
+    if(exs.length===0){alert('Keep mastering letters to unlock more words!');return;}
+    setExercises(exs); setSessionItems(si); setActiveZone('mine');
+    setScreen('word-intro');
+  };
 
-      const handlePlacement = results => {
-        const known = Object.entries(results).filter(([,v])=>v).map(([k])=>Number(k));
-        // Seed stats from placement
-        const newStats = {};
-        Object.entries(results).forEach(([id,ok])=>{
-          newStats[Number(id)] = { total:1, correct:ok?1:0, wrong:ok?0:1, lastSeen:Date.now() };
+  const handleDone = ({xp,em,learnedIds,secs,statsDelta}) => {
+    if(activeZone==='village'){
+      setLetterStats(prev=>{
+        const next={...prev};
+        Object.entries(statsDelta).forEach(([id,delta])=>{
+          const cur=next[Number(id)]||{total:0,correct:0,wrong:0};
+          next[Number(id)]={total:cur.total+delta.correct+delta.wrong,correct:cur.correct+delta.correct,wrong:cur.wrong+delta.wrong,lastSeen:Date.now()};
         });
-        const p = {...player, mastered:known, xp:known.length*8, emeralds:Math.floor(known.length/4), placementDone:true};
-        setPlayer(p); setStats(newStats);
-        setScreen('map');
-      };
-
-      const startLesson = () => {
-        const { exercises: exs, sessionLetters: sl } = buildSession(player.mastered, stats);
-        setExercises(exs);
-        setSessionLetters(sl);
-        setScreen('intro');
-      };
-
-      const handleDone = ({xp,em,learned,secs,statsDelta}) => {
-        // Merge stats delta into global stats
-        setStats(prev=>{
-          const next = {...prev};
-          Object.entries(statsDelta).forEach(([id,delta])=>{
-            const cur = next[Number(id)] || {total:0,correct:0,wrong:0};
-            next[Number(id)] = {
-              total:  cur.total  + delta.correct + delta.wrong,
-              correct:cur.correct + delta.correct,
-              wrong:  cur.wrong   + delta.wrong,
-              lastSeen: Date.now(),
-            };
-          });
-          return next;
+        return next;
+      });
+      const newMastered=[...new Set([...player.mastered,...learnedIds])].filter(id=>{
+        const s=letterStats[id];
+        if(!s||s.total<3)return learnedIds.includes(id);
+        return(s.correct/s.total)>=0.7;
+      });
+      const today=new Date().toDateString();
+      setPlayer(p=>({...p,xp:p.xp+xp,emeralds:p.emeralds+em,hearts:5,mastered:newMastered,streak:p.dailyDone?p.streak:p.streak+1,dailyDone:true,lastPlayDate:today}));
+    } else {
+      setWordStats(prev=>{
+        const next={...prev};
+        Object.entries(statsDelta).forEach(([id,delta])=>{
+          const cur=next[Number(id)]||{total:0,correct:0,wrong:0};
+          next[Number(id)]={total:cur.total+delta.correct+delta.wrong,correct:cur.correct+delta.correct,wrong:cur.wrong+delta.wrong,lastSeen:Date.now()};
         });
-        // Update mastered: letter counts as mastered when >70% correct across ≥5 attempts
-        const newMastered = [...new Set([...player.mastered,...learned])].filter(id=>{
-          const s = stats[id];
-          if (!s || s.total<3) return learned.includes(id);
-          return (s.correct/s.total)>=0.7;
-        });
-        const today = new Date().toDateString();
-        setPlayer(p=>({
-          ...p, xp:p.xp+xp, emeralds:p.emeralds+em, hearts:5,
-          mastered:newMastered,
-          streak:p.dailyDone?p.streak:p.streak+1,
-          dailyDone:true,
-          lastPlayDate:today,
-        }));
-        setScreen('map');
-      };
-
-      return (
-        <div style={{maxWidth:'430px',margin:'0 auto',minHeight:'100vh'}}>
-          {screen==='home'    && <Home player={player} onPlace={()=>setScreen('placement')} onContinue={()=>setScreen('map')}/>}
-          {screen==='placement'&&<Placement onDone={handlePlacement}/>}
-          {screen==='map'     && <WorldMap player={player} stats={stats} onZone={z=>z==='village'&&startLesson()}/>}
-          {screen==='intro'   && <LetterIntro sessionLetters={sessionLetters} onDone={()=>setScreen('lesson')}/>}
-          {screen==='lesson'  && <Lesson player={player} stats={stats} exercises={exercises} onDone={handleDone} onBack={()=>setScreen('map')}/>}
-        </div>
-      );
+        return next;
+      });
+      const today=new Date().toDateString();
+      setPlayer(p=>({...p,xp:p.xp+xp,emeralds:p.emeralds+em,hearts:5,streak:p.dailyDone?p.streak:p.streak+1,dailyDone:true,lastPlayDate:today}));
     }
+    setScreen('map');
+  };
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
-  </script>
+  const handleZone = z => {
+    if(z==='village') startVillage();
+    else if(z==='mine') startMine();
+  };
+
+  return (
+    <div style={{maxWidth:'430px',margin:'0 auto',minHeight:'100vh'}}>
+      {screen==='home'        && <Home player={player} onPlace={()=>setScreen('placement')} onContinue={()=>setScreen('map')}/>}
+      {screen==='placement'   && <Placement onDone={handlePlacement}/>}
+      {screen==='map'         && <WorldMap player={player} letterStats={letterStats} wordStats={wordStats} onZone={handleZone}/>}
+      {screen==='letter-intro'&& <LetterIntro sessionItems={sessionItems} onDone={()=>setScreen('lesson')}/>}
+      {screen==='word-intro'  && <WordIntro sessionItems={sessionItems} mastered={player.mastered} onDone={()=>setScreen('lesson')}/>}
+      {screen==='lesson'      && <Lesson player={player} exercises={exercises} zone={activeZone} onDone={handleDone} onBack={()=>setScreen('map')}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
 </body>
 </html>
